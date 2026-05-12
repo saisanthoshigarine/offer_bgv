@@ -23,7 +23,6 @@ BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 SENDER_NAME = os.environ.get("SENDER_NAME")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 BASE_URL = os.environ.get("BASE_URL")
-
 # ── Folders ───────────────────────────────────────────────────────────────────
 BASE_DIR = "/tmp"
 UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
@@ -64,7 +63,7 @@ def current_user():
     uid = session.get('user_id')
     return get_users().get(uid) if uid else None
 
-# ── Email via Brevo API ───────────────────────────────────────────────────────
+# ── Email via Brevo API ───────────────────────────────────────
 def send_email(to, subject, html_body, attach_path=None, attach_name=None):
     try:
         configuration = sib_api_v3_sdk.Configuration()
@@ -72,379 +71,45 @@ def send_email(to, subject, html_body, attach_path=None, attach_name=None):
         api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
             sib_api_v3_sdk.ApiClient(configuration)
         )
+
         attachments = []
+
         if attach_path and os.path.exists(attach_path):
             with open(attach_path, "rb") as f:
                 encoded_file = base64.b64encode(f.read()).decode()
+
             attachments.append({
                 "content": encoded_file,
                 "name": attach_name or "offer_letter.pdf"
             })
+
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             to=[{"email": to}],
-            sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
+            sender={
+                "name": SENDER_NAME,
+                "email": SENDER_EMAIL
+            },
             subject=subject,
             html_content=html_body,
             attachment=attachments
         )
+
         api_instance.send_transac_email(send_smtp_email)
+
         print(f"[BREVO EMAIL SENT] → {to}")
         return True
+
     except ApiException as e:
         print(f"[BREVO ERROR] → {e}")
         return False
+
     except Exception as e:
         print(f"[GENERAL EMAIL ERROR] → {e}")
         return False
 
 
-# ── Letter Pattern Templates ──────────────────────────────────────────────────
-# Each pattern returns an HTML string that overlays content ON the letterhead.
-# The letterhead PDF (if present) is shown as background via base64 iframe/img.
-
-LETTER_PATTERNS = {
-    'classic': {
-        'name': 'Classic Formal',
-        'description': 'Traditional corporate structure with centered header, ruled lines, and formal table layout.',
-        'preview_color': '#0d1b3e',
-    },
-    'modern': {
-        'name': 'Modern Minimal',
-        'description': 'Clean left-aligned design with accent sidebar stripe and bold typography.',
-        'preview_color': '#1a56db',
-    },
-    'elegant': {
-        'name': 'Elegant Executive',
-        'description': 'Luxury look with serif-inspired headers, gold accents, and refined spacing.',
-        'preview_color': '#7c5f1e',
-    },
-    'bold': {
-        'name': 'Bold Impact',
-        'description': 'High-contrast dark header block, modern sans-serif, vibrant green CTA styling.',
-        'preview_color': '#064e3b',
-    },
-    'custom': {
-        'name': 'Custom Pattern',
-        'description': 'Write your own letter structure. Use placeholders like {name}, {role}, {company}, {salary}, {joining_date}.',
-        'preview_color': '#6d28d9',
-    },
-}
-
-
-def _letterhead_base64(lh_path):
-    """Return base64-encoded PDF string if letterhead exists, else empty string."""
-    if lh_path and os.path.exists(lh_path):
-        with open(lh_path, 'rb') as f:
-            return base64.b64encode(f.read()).decode()
-    return ''
-
-
-def _lh_bg_block(lh_b64, height='220px'):
-    """HTML block that renders letterhead PDF as background on top of letter content."""
-    if not lh_b64:
-        return ''
-    return f'''
-    <div style="position:relative;width:100%;margin-bottom:0;border-bottom:2px solid #e2e8f0;">
-      <iframe
-        src="data:application/pdf;base64,{lh_b64}"
-        style="width:100%;height:{height};border:none;display:block;background:#fff;"
-        title="Company Letterhead"
-      ></iframe>
-      <div style="position:absolute;bottom:6px;right:10px;font-size:9px;
-                  color:#94a3b8;background:rgba(255,255,255,.7);padding:2px 6px;border-radius:4px;">
-        Company Letterhead
-      </div>
-    </div>'''
-
-
-def build_letter_html(pattern, candidate, hr_user, custom_text='', editable=False):
-    """
-    Build the offer letter HTML for a given pattern.
-    editable=True adds contenteditable spans for inline editing in preview.
-    """
-    company   = hr_user.get('company_name', '')
-    lh_path   = hr_user.get('letterhead', '')
-    lh_b64    = _letterhead_base64(lh_path)
-    today     = datetime.now().strftime('%d %B %Y')
-    name      = candidate.get('name', '')
-    role      = candidate.get('role', '')
-    joining   = candidate.get('joining_date', '')
-    salary    = candidate.get('salary', '')
-    emp_type  = candidate.get('employment_type', 'full_time').replace('_', ' ').title()
-    email     = candidate.get('email', '')
-
-    lh_block  = _lh_bg_block(lh_b64)
-
-    def e(field, val, tag='span'):
-        """Wrap in contenteditable span if editable mode."""
-        if editable:
-            return (f'<{tag} contenteditable="true" data-field="{field}" '
-                    f'style="border-bottom:1.5px dashed #1a56db;outline:none;'
-                    f'min-width:40px;display:inline-block;cursor:text;">{val}</{tag}>')
-        return val
-
-    # ── Pattern: Classic ────────────────────────────────────────────────────
-    if pattern == 'classic':
-        rows = ''.join(
-            f'<tr style="background:{"#f0f4ff" if i%2==0 else "#fff"}">'
-            f'<td style="padding:9px 14px;border:1px solid #e2e8f0;font-weight:700;color:#1a56db;width:42%;font-size:12px">{k}</td>'
-            f'<td style="padding:9px 14px;border:1px solid #e2e8f0;color:#1e293b;font-size:12px">{v}</td></tr>'
-            for i,(k,v) in enumerate([
-                ('Candidate Name', e('name', name)),
-                ('Designation / Role', e('role', role)),
-                ('Joining Date', e('joining_date', joining)),
-                ('Annual CTC', f'₹ {e("salary", salary)}'),
-                ('Employment Type', e('employment_type', emp_type)),
-                ('Reporting Location', 'As communicated by HR'),
-            ])
-        )
-        return f'''
-<div style="font-family:Georgia,serif;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-  {lh_block}
-  <div style="padding:28px 36px">
-    {"" if lh_b64 else f'<div style="text-align:center;margin-bottom:16px"><div style="font-size:22px;font-weight:900;color:#0d1b3e;font-family:Georgia,serif">{company}</div><div style="font-size:11px;color:#64748b;margin-top:3px">Human Resources Department</div></div>'}
-    <hr style="border:none;border-top:2.5px solid #1a56db;margin:0 0 14px"/>
-    <div style="text-align:center;font-size:17px;font-weight:700;color:#0d1b3e;letter-spacing:.5px;margin-bottom:16px">OFFER OF EMPLOYMENT</div>
-    <div style="font-size:11px;color:#64748b;margin-bottom:12px">Date: {today}</div>
-    <p style="font-size:13px;color:#1e293b;margin-bottom:8px">Dear <b>{e('name', name)}</b>,</p>
-    <p style="font-size:12px;color:#475569;line-height:1.9;margin-bottom:14px">
-      We are delighted to extend this offer of employment for the position of
-      <b style="color:#1a56db">{e('role', role)}</b> at <b>{company}</b>. We believe your skills are an excellent fit.
-    </p>
-    <p style="font-size:12px;font-weight:700;color:#0d1b3e;margin-bottom:8px">Offer Details:</p>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">{rows}</table>
-    <p style="font-size:12px;font-weight:700;color:#0d1b3e;margin-bottom:6px">This offer is subject to:</p>
-    <ul style="font-size:12px;color:#475569;line-height:2;margin-left:18px;margin-bottom:14px">
-      <li>Successful completion of background verification.</li>
-      <li>Submission of all required documents before joining.</li>
-      <li>Acceptance of the Code of Conduct and employment terms.</li>
-    </ul>
-    <p style="font-size:12px;color:#475569;line-height:1.8;margin-bottom:20px">
-      Please confirm your acceptance or decline via the buttons in the email we have sent to <b>{email}</b>.
-    </p>
-    <hr style="border:none;border-top:1px solid #e2e8f0;margin-bottom:12px"/>
-    <p style="font-size:12px;color:#1e293b;margin:0">Warm regards,</p>
-    <p style="font-size:13px;font-weight:700;color:#0d1b3e;margin:4px 0 0">HR Department — {company}</p>
-    <p style="font-size:10px;color:#94a3b8;margin-top:16px;text-align:center">Generated by OfferFlow · {today}</p>
-  </div>
-</div>'''
-
-    # ── Pattern: Modern ──────────────────────────────────────────────────────
-    elif pattern == 'modern':
-        items = [
-            ('Role', e('role', role)),
-            ('Joining Date', e('joining_date', joining)),
-            ('Annual CTC', f'₹ {e("salary", salary)}'),
-            ('Employment Type', e('employment_type', emp_type)),
-        ]
-        detail_rows = ''.join(
-            f'<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9">'
-            f'<span style="width:140px;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">{k}</span>'
-            f'<span style="font-size:13px;color:#0f172a;font-weight:700">{v}</span>'
-            f'</div>'
-            for k,v in items
-        )
-        return f'''
-<div style="font-family:\'Segoe UI\',Arial,sans-serif;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.08);display:flex;flex-direction:column">
-  {lh_block}
-  <div style="display:flex;min-height:520px">
-    <div style="width:8px;background:linear-gradient(180deg,#1a56db,#0ea5e9);flex-shrink:0"></div>
-    <div style="flex:1;padding:30px 32px">
-      {"" if lh_b64 else f'<div style="font-size:20px;font-weight:900;color:#0d1b3e;margin-bottom:2px">{company}</div><div style="font-size:11px;color:#94a3b8;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px">Human Resources</div>'}
-      <div style="display:inline-block;background:#dbeafe;color:#1a56db;font-size:10px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.8px;text-transform:uppercase;margin-bottom:16px">Official Offer Letter</div>
-      <div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:6px">Congratulations, {e('name', name)}! 🎉</div>
-      <p style="font-size:13px;color:#64748b;line-height:1.9;margin-bottom:20px">
-        We're thrilled to offer you the role of <b style="color:#1a56db">{e('role', role)}</b> at <b>{company}</b>.
-        Please review the details below and respond at your earliest convenience.
-      </p>
-      <div style="background:#f8faff;border-radius:10px;padding:18px 22px;margin-bottom:20px">
-        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Offer Details</div>
-        {detail_rows}
-      </div>
-      <p style="font-size:12px;color:#64748b;line-height:1.8;margin-bottom:14px">
-        This offer is contingent on background verification, document submission, and acceptance of employment terms.
-      </p>
-      <p style="font-size:12px;color:#475569">A confirmation link has been sent to <b>{email}</b>. Please respond within 48 hours.</p>
-      <div style="margin-top:24px;padding-top:16px;border-top:1px solid #f1f5f9">
-        <p style="font-size:12px;color:#0f172a;margin:0">Best regards,</p>
-        <p style="font-size:13px;font-weight:700;color:#1a56db;margin:4px 0 0">{company} — HR Team</p>
-        <p style="font-size:10px;color:#94a3b8;margin-top:10px">{today} · OfferFlow</p>
-      </div>
-    </div>
-  </div>
-</div>'''
-
-    # ── Pattern: Elegant ────────────────────────────────────────────────────
-    elif pattern == 'elegant':
-        rows = ''.join(
-            f'<tr><td style="padding:10px 16px;font-size:12px;color:#7c5f1e;font-weight:600;border-bottom:1px solid #fef3c7;width:44%">{k}</td>'
-            f'<td style="padding:10px 16px;font-size:12px;color:#1e293b;border-bottom:1px solid #fef3c7">{v}</td></tr>'
-            for k,v in [
-                ('Candidate Name', e('name', name)),
-                ('Position', e('role', role)),
-                ('Commencement Date', e('joining_date', joining)),
-                ('Annual Remuneration', f'₹ {e("salary", salary)}'),
-                ('Nature of Employment', e('employment_type', emp_type)),
-            ]
-        )
-        return f'''
-<div style="font-family:Garamond,Georgia,serif;background:#fffdf5;border:1px solid #f59e0b;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(245,158,11,.12)">
-  {lh_block}
-  <div style="padding:32px 38px">
-    {"" if lh_b64 else f'<div style="text-align:center;margin-bottom:20px"><div style="font-size:24px;font-weight:700;color:#7c5f1e;letter-spacing:1.5px">{company.upper()}</div><div style="width:60px;height:2px;background:linear-gradient(90deg,#f59e0b,#d97706);margin:8px auto;border-radius:2px"></div><div style="font-size:11px;color:#a16207;letter-spacing:2px;text-transform:uppercase">Human Resources</div></div>'}
-    <div style="text-align:center;font-size:16px;font-weight:700;color:#7c5f1e;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid #fde68a">
-      ✦ Offer of Employment ✦
-    </div>
-    <div style="font-size:11px;color:#a16207;margin-bottom:14px;font-style:italic">Date: {today}</div>
-    <p style="font-size:13px;color:#1e293b;margin-bottom:10px">Dear <b>{e('name', name)}</b>,</p>
-    <p style="font-size:12.5px;color:#57534e;line-height:2;margin-bottom:18px">
-      It is our distinct pleasure to extend a formal offer of employment for the distinguished position of
-      <em><b style="color:#7c5f1e">{e('role', role)}</b></em> at <b>{company}</b>.
-      We have reviewed your credentials with great admiration and are confident you will be an invaluable addition.
-    </p>
-    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;overflow:hidden;margin-bottom:18px">
-      <div style="background:#fef3c7;padding:8px 16px;font-size:11px;font-weight:700;color:#7c5f1e;letter-spacing:1px;text-transform:uppercase">Terms of Engagement</div>
-      <table style="width:100%;border-collapse:collapse">{rows}</table>
-    </div>
-    <p style="font-size:12px;color:#57534e;line-height:1.9;margin-bottom:14px">
-      This offer is subject to the successful conclusion of background verification procedures, submission of requisite documentation, and your agreement to the terms of employment.
-    </p>
-    <p style="font-size:12px;color:#57534e">Kindly confirm your acceptance via the correspondence addressed to <b>{email}</b>.</p>
-    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #fde68a">
-      <p style="font-size:12px;color:#1e293b;margin:0">Yours sincerely,</p>
-      <p style="font-size:13px;font-weight:700;color:#7c5f1e;margin:4px 0 0">Office of Human Resources — {company}</p>
-      <p style="font-size:10px;color:#a3a3a3;margin-top:14px;text-align:center;font-style:italic">Issued via OfferFlow · {today}</p>
-    </div>
-  </div>
-</div>'''
-
-    # ── Pattern: Bold ───────────────────────────────────────────────────────
-    elif pattern == 'bold':
-        cards = ''.join(
-            f'<div style="background:rgba(255,255,255,.08);border-radius:8px;padding:12px 16px;margin-bottom:8px">'
-            f'<div style="font-size:10px;color:#6ee7b7;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">{k}</div>'
-            f'<div style="font-size:14px;color:#fff;font-weight:700">{v}</div>'
-            f'</div>'
-            for k,v in [
-                ('Role', e('role', role)),
-                ('Start Date', e('joining_date', joining)),
-                ('Annual CTC', f'₹ {e("salary", salary)}'),
-                ('Employment Type', e('employment_type', emp_type)),
-            ]
-        )
-        return f'''
-<div style="font-family:\'Segoe UI\',Arial,sans-serif;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.1)">
-  {lh_block}
-  <div style="background:linear-gradient(135deg,#064e3b 0%,#065f46 50%,#047857 100%);padding:32px 36px;color:#fff">
-    {"" if lh_b64 else f'<div style="font-size:13px;font-weight:700;color:#6ee7b7;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">{company}</div>'}
-    <div style="font-size:28px;font-weight:900;line-height:1.2;margin-bottom:8px">You're In! 🚀</div>
-    <div style="font-size:14px;color:rgba(255,255,255,.8);margin-bottom:24px">Official Offer — {today}</div>
-    <div style="font-size:15px;margin-bottom:20px">Hello <b>{e('name', name)}</b>, we're excited to have you join us as <b style="color:#6ee7b7">{e('role', role)}</b>.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">{cards}</div>
-  </div>
-  <div style="padding:24px 36px">
-    <p style="font-size:12px;color:#64748b;line-height:1.9;margin-bottom:14px">
-      This offer is valid for <b>48 hours</b>. It is contingent on background verification and document submission.
-      Please click the response buttons in the email sent to <b>{email}</b>.
-    </p>
-    <div style="background:#f0fdf4;border-left:4px solid #10b981;border-radius:4px;padding:12px 16px;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.5px">What happens next?</div>
-      <ul style="font-size:12px;color:#475569;margin:8px 0 0;padding-left:16px;line-height:2">
-        <li>Accept the offer via the email link</li>
-        <li>Complete background verification</li>
-        <li>Submit required documents</li>
-        <li>Get your onboarding schedule</li>
-      </ul>
-    </div>
-    <p style="font-size:12px;color:#1e293b;margin:0">All the best,</p>
-    <p style="font-size:13px;font-weight:700;color:#065f46;margin:4px 0 0">{company} HR Team</p>
-    <p style="font-size:10px;color:#94a3b8;margin-top:12px">OfferFlow · {today}</p>
-  </div>
-</div>'''
-
-    # ── Pattern: Custom ─────────────────────────────────────────────────────
-    elif pattern == 'custom':
-        # Replace placeholders in user-supplied custom_text
-        filled = (custom_text
-            .replace('{name}', e('name', name))
-            .replace('{role}', e('role', role))
-            .replace('{company}', company)
-            .replace('{salary}', e('salary', salary))
-            .replace('{joining_date}', e('joining_date', joining))
-            .replace('{employment_type}', e('employment_type', emp_type))
-            .replace('{email}', email)
-            .replace('{date}', today)
-            .replace('\n', '<br>')
-        )
-        return f'''
-<div style="font-family:\'Segoe UI\',Arial,sans-serif;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-  {lh_block}
-  <div style="padding:28px 36px">
-    {"" if lh_b64 else f'<div style="font-size:20px;font-weight:900;color:#6d28d9;margin-bottom:4px">{company}</div><div style="font-size:11px;color:#94a3b8;margin-bottom:16px">Human Resources Department</div>'}
-    <div style="background:#f5f3ff;border-left:4px solid #6d28d9;border-radius:4px;padding:8px 14px;margin-bottom:18px;font-size:11px;color:#5b21b6;font-weight:600">
-      📝 Custom Letter Template — {today}
-    </div>
-    <div style="font-size:13px;color:#1e293b;line-height:2">{filled}</div>
-    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0 12px"/>
-    <p style="font-size:12px;color:#94a3b8;text-align:center">Generated by OfferFlow · {today}</p>
-  </div>
-</div>'''
-
-    # Fallback to classic
-    return build_letter_html('classic', candidate, hr_user, editable=editable)
-
-
-# ── Preview HTML builder (with edit overlay) ──────────────────────────────────
-def letterhead_preview_html(hr_user, candidate, pattern='classic', custom_text=''):
-    """Returns the full preview HTML with edit controls and live letter."""
-    letter_html = build_letter_html(pattern, candidate, hr_user, custom_text, editable=True)
-
-    edit_bar = '''
-    <div id="edit-bar" style="background:#1a56db;color:#fff;padding:10px 18px;
-         border-radius:8px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span style="font-size:12px;font-weight:700">✏️ Inline Edit Mode</span>
-      <span style="font-size:11px;opacity:.8">Click any underlined field to edit it directly</span>
-      <button onclick="collectEdits()" style="margin-left:auto;background:#fff;color:#1a56db;
-              border:none;padding:7px 18px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">
-        💾 Save Edits
-      </button>
-      <button onclick="resetEdits()" style="background:rgba(255,255,255,.15);color:#fff;
-              border:1px solid rgba(255,255,255,.3);padding:7px 14px;border-radius:6px;
-              font-size:12px;cursor:pointer">
-        ↺ Reset
-      </button>
-    </div>
-    <script>
-    function collectEdits() {
-      const edits = {};
-      document.querySelectorAll('[contenteditable][data-field]').forEach(el => {
-        edits[el.dataset.field] = el.innerText.trim();
-      });
-      // Dispatch to parent page if inside an iframe, or call window callback
-      if (window.onPreviewEdits) window.onPreviewEdits(edits);
-      else if (window.parent && window.parent.onPreviewEdits) window.parent.onPreviewEdits(edits);
-      else {
-        const ev = new CustomEvent('previewEdits', {detail: edits, bubbles: true});
-        document.dispatchEvent(ev);
-      }
-      const btn = event.target;
-      btn.textContent = '✅ Saved!';
-      setTimeout(() => btn.textContent = '💾 Save Edits', 1500);
-    }
-    function resetEdits() {
-      location.reload();
-    }
-    </script>
-    '''
-    return edit_bar + letter_html
-
-
-# ── PDF offer letter generator (kept for legacy; no longer auto-attached) ────
-def generate_offer_pdf(candidate, hr_user, pattern='classic', custom_text=''):
-    """
-    Generates a PDF offer letter. Note: PDF is NO LONGER auto-attached to
-    accept/decline emails. This function is retained for manual download use.
-    """
+# ── PDF offer letter generator ─────────────────────────────────────────────────
+def generate_offer_pdf(candidate, hr_user):
     cid      = candidate['id']
     out_path = os.path.join(LETTER_DIR, f"offer_{cid}.pdf")
     today    = datetime.now().strftime('%d %B %Y')
@@ -483,7 +148,7 @@ def generate_offer_pdf(candidate, hr_user, pattern='classic', custom_text=''):
         ['Candidate Name', name],
         ['Designation / Role', role],
         ['Joining Date', joining],
-        ['Annual CTC', f'₹ {salary}'],
+        [f'Annual CTC', f'\u20b9 {salary}'],
         ['Employment Type', emp_type],
         ['Reporting Location', 'As communicated by HR'],
     ]
@@ -516,7 +181,8 @@ def generate_offer_pdf(candidate, hr_user, pattern='classic', custom_text=''):
         Spacer(1,4),
         Paragraph(
             f'We are delighted to extend this offer of employment for the position of '
-            f'<b>{role}</b> at <b>{company}</b>.', body),
+            f'<b>{role}</b> at <b>{company}</b>. We believe your skills and experience '
+            f'are an excellent fit for our team.', body),
         Spacer(1,10),
         Paragraph('Your offer details:', bold_body),
         Spacer(1,6),
@@ -527,25 +193,168 @@ def generate_offer_pdf(candidate, hr_user, pattern='classic', custom_text=''):
         Paragraph('• Submission of all required documents before joining.', body),
         Paragraph('• Acceptance of the company\'s Code of Conduct and employment terms.', body),
         Spacer(1,12),
+        Paragraph(
+            'Please confirm your acceptance via the <b>Accept Offer</b> button in your email. '
+            'We look forward to welcoming you to our team.', body),
+        Spacer(1,24),
+        HRFlowable(width='100%', thickness=0.5,
+                   color=colors.HexColor('#e2e8f0'), spaceAfter=12),
         Paragraph('Warm regards,', body),
         Paragraph(f'<b>HR Department — {company}</b>', bold_body),
         Spacer(1,20),
         Paragraph(f'Generated by OfferFlow on {today}.', small_gray),
     ]
 
-    doc.build(story)
-    buf.seek(0)
-    open(out_path,'wb').write(buf.read())
+    # If letterhead PDF exists, add it as background on first page
+    lh_path = hr_user.get('letterhead','')
+    if lh_path and os.path.exists(lh_path):
+        # Increase top margin to avoid overlapping letterhead header
+        doc2 = SimpleDocTemplate(buf, pagesize=A4,
+                                 rightMargin=22*mm, leftMargin=22*mm,
+                                 topMargin=52*mm, bottomMargin=22*mm)
+        buf2 = io.BytesIO()
+        doc2 = SimpleDocTemplate(buf2, pagesize=A4,
+                                 rightMargin=22*mm, leftMargin=22*mm,
+                                 topMargin=52*mm, bottomMargin=22*mm)
+
+        # Remove company header from story (letterhead has it)
+        story_no_header = story[3:]   # skip co_style, sub_style, hrule
+        doc2.build(story_no_header)
+        buf2.seek(0)
+
+        # Merge: draw letterhead PDF as background, overlay content
+        try:
+            _merge_letterhead(lh_path, buf2.read(), out_path)
+        except Exception as e:
+            print(f"Merge failed: {e}; using plain PDF")
+            doc.build(story)
+            buf.seek(0)
+            open(out_path,'wb').write(buf.read())
+    else:
+        doc.build(story)
+        buf.seek(0)
+        open(out_path,'wb').write(buf.read())
+
     return out_path
+
+
+def _merge_letterhead(lh_path, content_bytes, out_path):
+    """
+    Vercel-safe letterhead merge function.
+
+    Since Vercel serverless functions do not support Poppler/pdf2image
+    properly, this function safely writes the generated PDF content
+    directly without attempting PDF background merging.
+
+    Parameters:
+        lh_path (str): Path to company letterhead PDF
+        content_bytes (bytes): Generated offer letter PDF bytes
+        out_path (str): Final output PDF path
+
+    Returns:
+        str: Output PDF path
+    """
+
+    try:
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
+        # Write generated PDF directly
+        with open(out_path, "wb") as f:
+            f.write(content_bytes)
+
+        print(f"[PDF GENERATED] → {out_path}")
+
+        return out_path
+
+    except Exception as e:
+        print(f"[MERGE LETTERHEAD ERROR] → {e}")
+        return None
+
+
+def letterhead_preview_html(hr_user, candidate):
+    """HTML preview of offer letter rendered on letterhead."""
+    company  = hr_user['company_name']
+    lh_path  = hr_user.get('letterhead','')
+    today    = datetime.now().strftime('%d %B %Y')
+    name     = candidate.get('name','')
+    role     = candidate.get('role','')
+    joining  = candidate.get('joining_date','')
+    salary   = candidate.get('salary','')
+    emp_type = candidate.get('employment_type','full_time').replace('_',' ').title()
+    email    = candidate.get('email','')
+
+    lh_block = ''
+    if lh_path and os.path.exists(lh_path):
+        with open(lh_path,'rb') as f:
+            b64 = base64.b64encode(f.read()).decode()
+        lh_block = f'''
+        <div style="margin-bottom:0">
+          <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:6px;
+                      padding:8px 14px;margin-bottom:10px;font-size:11px;color:#92400e;">
+            📄 <b>Company Letterhead</b> — this PDF is attached to the offer email sent to the candidate.
+          </div>
+          <iframe src="data:application/pdf;base64,{b64}" width="100%" height="180"
+            style="border:1px solid #e2e8f0;border-radius:6px;display:block;margin-bottom:12px"
+            title="Company Letterhead Preview"></iframe>
+        </div>'''
+
+    rows = ''.join(
+        f'<tr style="background:{"#f0f4ff" if i%2==0 else "#fff"}">'
+        f'<td style="padding:10px 14px;border:1px solid #e2e8f0;font-weight:700;color:#1a56db;width:42%">{k}</td>'
+        f'<td style="padding:10px 14px;border:1px solid #e2e8f0;color:#1e293b">{v}</td></tr>'
+        for i,(k,v) in enumerate([
+            ('Candidate Name', name),('Designation / Role', role),
+            ('Joining Date', joining),(f'Annual CTC', f'₹ {salary}'),
+            ('Employment Type', emp_type),('Reporting Location','As communicated by HR'),
+        ])
+    )
+
+    return f'''
+<div style="font-family:Georgia,serif;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+  {lh_block}
+  <div style="padding:30px 34px">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-family:Arial,sans-serif;font-size:22px;font-weight:900;color:#0d1b3e">{company}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px">Human Resources Department</div>
+      <div style="height:3px;background:linear-gradient(90deg,#1a56db,#0ea5e9);width:70px;margin:10px auto 0;border-radius:2px"></div>
+    </div>
+    <div style="text-align:center;font-size:18px;font-weight:700;color:#0d1b3e;margin-bottom:18px;border-bottom:1.5px solid #e2e8f0;padding-bottom:14px">
+      OFFER OF EMPLOYMENT
+    </div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:10px">Date: {today}</div>
+    <p style="font-size:13px;color:#1e293b;margin-bottom:10px">Dear <b>{name}</b>,</p>
+    <p style="font-size:12px;color:#475569;line-height:1.8;margin-bottom:14px">
+      We are delighted to extend this offer of employment for the position of
+      <b style="color:#1a56db">{role}</b> at <b>{company}</b>.
+    </p>
+    <p style="font-size:11.5px;font-weight:700;color:#0d1b3e;margin-bottom:8px">Offer Details:</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:11.5px">
+      {rows}
+    </table>
+    <p style="font-size:11.5px;font-weight:700;color:#0d1b3e;margin-bottom:6px">This offer is subject to:</p>
+    <ul style="font-size:11.5px;color:#475569;line-height:2;margin-left:18px;margin-bottom:14px">
+      <li>Successful completion of background verification.</li>
+      <li>Submission of all required documents before joining.</li>
+      <li>Acceptance of the company's Code of Conduct and employment terms.</li>
+    </ul>
+    <p style="font-size:12px;color:#475569;line-height:1.8;margin-bottom:20px">
+      Please accept or decline via the buttons in the email. We look forward to welcoming you.
+    </p>
+    <div style="border-top:1px solid #e2e8f0;padding-top:16px">
+      <p style="font-size:11.5px;color:#1e293b;margin:0">Warm regards,</p>
+      <p style="font-size:12px;font-weight:700;color:#0d1b3e;margin:4px 0 0">HR Department — {company}</p>
+    </div>
+    <div style="margin-top:16px;padding:10px;background:#f8faff;border-radius:6px;
+                font-size:10px;color:#94a3b8;text-align:center">
+      📧 PDF offer letter will be sent as an attachment to <b>{email}</b>
+    </div>
+  </div>
+</div>'''
 
 
 # ── Email HTML builders ────────────────────────────────────────────────────────
 def offer_email_html(c, hr, accept_link, decline_link):
-    """
-    Offer email sent to candidate.
-    NOTE: No PDF is attached — PDF attachment removed as requested.
-    The email contains Accept/Decline buttons only.
-    """
     company  = hr['company_name']
     name     = c.get('name','')
     role     = c.get('role','')
@@ -556,19 +365,13 @@ def offer_email_html(c, hr, accept_link, decline_link):
         f'<tr style="background:{"#f8faff" if i%2==0 else "#fff"}">'
         f'<td style="padding:11px 16px;font-weight:700;color:#1a56db;font-size:13px;width:38%">{k}</td>'
         f'<td style="padding:11px 16px;color:#1e293b;font-size:13px">{v}</td></tr>'
-        for i,(k,v) in enumerate([
-            ('Role', role),
-            ('Joining Date', joining),
-            ('Annual CTC', '₹ '+str(salary)),
-            ('Employment Type', emp_type)
-        ])
-    )
+        for i,(k,v) in enumerate([('Role',role),('Joining Date',joining),
+            ('Annual CTC','₹ '+str(salary)),('Employment Type',emp_type)]))
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f0f4fa;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0"
-  style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,#0d1b3e 0%,#1a56db 100%);padding:36px 40px;text-align:center">
     <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:1px">{company}</div>
     <div style="font-size:12px;color:rgba(255,255,255,.7);margin-top:6px">Official Offer Letter</div>
@@ -576,12 +379,10 @@ def offer_email_html(c, hr, accept_link, decline_link):
   <tr><td style="padding:36px 40px">
     <h2 style="font-size:22px;color:#0d1b3e;margin:0 0 8px">🎉 Congratulations, {name}!</h2>
     <p style="color:#64748b;font-size:13.5px;line-height:1.9;margin:0 0 22px">
-      We are pleased to extend an offer for the role of
-      <b style="color:#1a56db">{role}</b> at <b>{company}</b>.
+      We are pleased to extend an offer for the role of <b style="color:#1a56db">{role}</b> at <b>{company}</b>.
       Please review the details below and <b>respond within 48 hours</b>.
     </p>
-    <table width="100%" cellpadding="0" cellspacing="0"
-      style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px">
       {rows}
     </table>
     <p style="color:#475569;font-size:13px;margin-bottom:20px;text-align:center">
@@ -590,74 +391,23 @@ def offer_email_html(c, hr, accept_link, decline_link):
     <table cellpadding="0" cellspacing="0" style="margin:0 auto">
       <tr>
         <td style="padding-right:14px">
-          <a href="{accept_link}"
-            style="display:inline-block;background:#10b981;color:#fff;
-               padding:14px 34px;border-radius:9px;text-decoration:none;font-weight:700;
-               font-size:15px;letter-spacing:.3px;font-family:Arial,sans-serif">✓ Accept Offer</a>
+          <a href="{accept_link}" style="display:inline-block;background:#10b981;color:#fff;
+             padding:14px 34px;border-radius:9px;text-decoration:none;font-weight:700;
+             font-size:15px;letter-spacing:.3px;font-family:Arial,sans-serif">✓ Accept Offer</a>
         </td>
         <td>
-          <a href="{decline_link}"
-            style="display:inline-block;background:#ef4444;color:#fff;
-               padding:14px 34px;border-radius:9px;text-decoration:none;font-weight:700;
-               font-size:15px;letter-spacing:.3px;font-family:Arial,sans-serif">✕ Decline Offer</a>
+          <a href="{decline_link}" style="display:inline-block;background:#ef4444;color:#fff;
+             padding:14px 34px;border-radius:9px;text-decoration:none;font-weight:700;
+             font-size:15px;letter-spacing:.3px;font-family:Arial,sans-serif">✕ Decline Offer</a>
         </td>
       </tr>
     </table>
     <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:22px;line-height:1.7">
-      ⏰ Offer expires automatically after 48 hours if no response.
+      ⏰ Offer expires automatically after 48 hours if no response.<br>
+      📎 Your offer letter PDF is attached to this email.
     </p>
   </td></tr>
   <tr><td style="background:#f8faff;padding:14px 40px;text-align:center;border-top:1px solid #e2e8f0">
-    <p style="color:#94a3b8;font-size:11px;margin:0">Sent via OfferFlow · {company} HR Portal</p>
-  </td></tr>
-</table></td></tr></table></body></html>"""
-
-
-def verification_email_html(c, bg_link, company):
-    """Immediate verification email sent right after candidate accepts."""
-    name = c.get('name', '')
-    role = c.get('role', '')
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f0f4fa;font-family:Arial,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0"
-  style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
-  <tr><td style="background:linear-gradient(135deg,#0d1b3e,#1a56db);padding:30px 40px;text-align:center">
-    <div style="font-size:22px;font-weight:900;color:#fff">{company}</div>
-    <div style="font-size:12px;color:rgba(255,255,255,.7);margin-top:5px">Background Verification</div>
-  </td></tr>
-  <tr><td style="padding:36px 40px">
-    <div style="font-size:40px;text-align:center;margin-bottom:14px">📋</div>
-    <h2 style="font-size:20px;color:#0d1b3e;text-align:center;margin:0 0 10px">
-      Next Step: Background Verification
-    </h2>
-    <p style="color:#64748b;font-size:13.5px;line-height:1.9;text-align:center;margin:0 0 24px">
-      Hello <b>{name}</b>, thank you for accepting the offer for <b style="color:#1a56db">{role}</b>!<br>
-      Please complete your background verification to proceed with onboarding.
-    </p>
-    <div style="text-align:center;margin-bottom:24px">
-      <a href="{bg_link}"
-        style="display:inline-block;background:#1a56db;color:#fff;
-               padding:15px 40px;border-radius:10px;text-decoration:none;
-               font-weight:700;font-size:15px;letter-spacing:.3px">
-        🚀 Start Background Verification
-      </a>
-    </div>
-    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:14px 18px">
-      <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px">You will need to provide:</div>
-      <ul style="font-size:12px;color:#475569;line-height:2;margin:0;padding-left:18px">
-        <li>Personal details (Aadhaar, PAN)</li>
-        <li>Educational qualifications</li>
-        <li>Previous employment details (if applicable)</li>
-        <li>Your digital signature</li>
-      </ul>
-    </div>
-    <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:18px">
-      This link is unique to you. Do not share it.
-    </p>
-  </td></tr>
-  <tr><td style="background:#f8faff;padding:12px 40px;text-align:center;border-top:1px solid #e2e8f0">
     <p style="color:#94a3b8;font-size:11px;margin:0">Sent via OfferFlow · {company} HR Portal</p>
   </td></tr>
 </table></td></tr></table></body></html>"""
@@ -834,15 +584,6 @@ def api_verifications():
     if status: result = [r for r in result if r['verification_status']==status]
     return jsonify(result)
 
-# ── Letter Patterns API ───────────────────────────────────────────────────────
-@app.route('/api/letter-patterns')
-def api_letter_patterns():
-    """Return list of available letter patterns."""
-    return jsonify([
-        {'id': pid, **info}
-        for pid, info in LETTER_PATTERNS.items()
-    ])
-
 # Upload Excel
 @app.route('/upload-excel')
 def upload_excel_page():
@@ -884,8 +625,6 @@ def api_save_candidates():
             'name':rec.get('Name',''),'email':rec.get('Gmail id',''),
             'role':rec.get('Role',''),'joining_date':str(rec.get('Joining date','')),
             'salary':str(rec.get('Salary','')),'employment_type':data.get('employment_type','full_time'),
-            'letter_pattern': data.get('letter_pattern','classic'),
-            'custom_letter_text': data.get('custom_letter_text',''),
             'offer_status':'pending','sent_at':str(datetime.now()),
             'extra':{k:v for k,v in rec.items() if k not in ['Name','Gmail id','Role','Joining date','Salary']}
         }
@@ -901,24 +640,26 @@ def api_preview_letter():
     c = data.get('candidate',{})
     c['employment_type'] = data.get('employment_type','full_time')
     c['id'] = 'preview'
-    pattern     = data.get('letter_pattern','classic')
-    custom_text = data.get('custom_letter_text','')
-    html = letterhead_preview_html(u, c, pattern=pattern, custom_text=custom_text)
-    return jsonify({'success':True,'html': html})
+    return jsonify({'success':True,'html': letterhead_preview_html(u, c)})
 
 @app.route('/api/send-offer-emails', methods=['POST'])
 def api_send_offer_emails():
+
     u = current_user()
+
     if not u:
         return jsonify({'success':False}), 401
 
     data  = request.json or {}
     cids  = data.get('candidate_ids', [])
     cands = get_cands()
-    sent  = 0
+
+    sent = 0
 
     for cid in cids:
+
         c = cands.get(cid)
+
         if not c:
             continue
 
@@ -930,72 +671,102 @@ def api_send_offer_emails():
         accept_link  = f"{BASE_URL}/offer-response/{cid}/accept"
         decline_link = f"{BASE_URL}/offer-response/{cid}/decline"
 
-        # Send offer email WITHOUT PDF attachment
+        try:
+            pdf_path = generate_offer_pdf(c, u)
+        except Exception as e:
+            print(f"PDF failed for {cid}: {e}")
+            pdf_path = None
+
         subject = f"Job Offer — {c.get('role','')} at {u['company_name']}"
+
         send_email(
             c['email'],
             subject,
-            offer_email_html(c, u, accept_link, decline_link)
-            # No attach_path — PDF removed from offer email
+            offer_email_html(c, u, accept_link, decline_link),
+            attach_path=pdf_path,
+            attach_name=f"Offer_Letter_{c['name'].replace(' ','_')}.pdf"
         )
 
         # Mark email as sent
         cands[cid]['email_sent_at'] = str(datetime.now())
+
         sent += 1
 
     save_cands(cands)
 
-    # 48h auto-cancel
+        # 48h auto-cancel
     def auto_cancel(ids):
         import time
         time.sleep(172800)
+
         c2 = get_cands()
-        changed = any(c2.get(i, {}).get('offer_status') == 'pending' for i in ids)
+
+        changed = any(
+            c2.get(i, {}).get('offer_status') == 'pending'
+            for i in ids
+        )
+
         for i in ids:
             if c2.get(i, {}).get('offer_status') == 'pending':
                 c2[i]['offer_status'] = 'cancelled'
+
         if changed:
             save_cands(c2)
 
-    threading.Thread(target=auto_cancel, args=(cids,), daemon=True).start()
+    threading.Thread(
+        target=auto_cancel,
+        args=(cids,),
+        daemon=True
+    ).start()
 
-    return jsonify({'success':True,'sent':sent})
-
-
-# ── Offer Response (Accept / Decline) ─────────────────────────────────────────
+    return jsonify({
+        'success': True,
+        'sent': sent
+    })
 @app.route('/offer-response/<cid>/<action>')
 def offer_response(cid, action):
     cands = get_cands()
-    c     = cands.get(cid)
+    c = cands.get(cid)
 
     if not c:
-        return """<div style='font-family:sans-serif;text-align:center;margin-top:80px'>
-                    <h2>Invalid or expired link.</h2></div>""", 404
+        return """
+        <div style='font-family:sans-serif;text-align:center;margin-top:80px'>
+            <h2>Invalid or expired link.</h2>
+        </div>
+        """, 404
 
     current_status = c.get('offer_status', 'pending')
 
-    # Already responded
+    # Prevent multiple processing
     if current_status in ['accepted', 'declined', 'cancelled']:
         return render_template(
-            'offer_accepted.html' if current_status == 'accepted' else 'offer_declined.html',
+            'offer_accepted.html' if current_status == 'accepted'
+            else 'offer_declined.html',
             candidate=c
         )
 
-    # ── ACCEPT ───────────────────────────────────────────────────────────────
+    # ACCEPT OFFER
     if action == 'accept':
+
         c['offer_status'] = 'accepted'
         c['responded_at'] = str(datetime.now())
         save_cands(cands)
 
         verifs = get_verifs()
 
-        # Avoid duplicate verification entry
-        existing = next((v for v in verifs.values() if v.get('candidate_id') == cid), None)
+        # Avoid duplicate verification creation
+        existing = next(
+            (v for v in verifs.values()
+             if v.get('candidate_id') == cid),
+            None
+        )
 
         if not existing:
+
             vid = str(uuid.uuid4())
+
             verifs[vid] = {
-                'id':  vid,
+                'id': vid,
                 'candidate_id': cid,
                 'hr_id': c['hr_id'],
                 'name': c['name'],
@@ -1005,105 +776,118 @@ def offer_response(cid, action):
                 'verification_status': 'pending',
                 'created_at': str(datetime.now())
             }
+
             save_verifs(verifs)
 
-            # ── Send verification email IMMEDIATELY ──────────────────────────
-            users   = get_users()
-            hr      = users.get(c['hr_id'], {})
-            company = hr.get('company_name', 'the company')
             bg_link = f"{BASE_URL}/background-verification/{vid}"
 
+            users = get_users()
+            hr = users.get(c['hr_id'], {})
+            company = hr.get('company_name', 'the company')
+
+            # Send ONLY ONCE
             send_email(
                 c['email'],
-                f'Next Step: Complete Background Verification — {company}',
-                verification_email_html(c, bg_link, company)
+                'Next Step: Complete Background Verification',
+                f"""
+                <html>
+                <body style="font-family:Arial;padding:40px">
+                    <h2>Background Verification</h2>
+
+                    <p>Hello {c['name']},</p>
+
+                    <p>
+                        Thank you for accepting the offer for
+                        <b>{c.get('role','')}</b>.
+                    </p>
+
+                    <p>
+                        Please complete your background verification.
+                    </p>
+
+                    <a href="{bg_link}"
+                    style="
+                        background:#1a56db;
+                        color:white;
+                        padding:12px 24px;
+                        text-decoration:none;
+                        border-radius:8px;
+                        display:inline-block;
+                    ">
+                        Start Verification
+                    </a>
+                </body>
+                </html>
+                """
             )
 
         return render_template('offer_accepted.html', candidate=c)
 
-    # ── DECLINE ──────────────────────────────────────────────────────────────
+    # DECLINE OFFER
     elif action == 'decline':
+
         c['offer_status'] = 'declined'
         c['responded_at'] = str(datetime.now())
+
         save_cands(cands)
+
         return render_template('offer_declined.html', candidate=c)
 
-    return """<div style='font-family:sans-serif;text-align:center;margin-top:80px'>
-                <h2>Invalid action.</h2></div>"""
-
-
-# ── Background Verification ────────────────────────────────────────────────────
+    return """
+    <div style='font-family:sans-serif;text-align:center;margin-top:80px'>
+        <h2>Invalid action.</h2>
+    </div>
+    """
 @app.route('/background-verification/<vid>')
 def background_verification_page(vid):
+
     verifs = get_verifs()
     v = verifs.get(vid)
+
     if not v:
-        return """<div style='font-family:sans-serif;text-align:center;margin-top:80px'>
-                    <h2>Invalid verification link.</h2></div>""", 404
-    return render_template('background_verification.html', verification=v)
+        return """
+        <div style='font-family:sans-serif;text-align:center;margin-top:80px'>
+            <h2>Invalid verification link.</h2>
+        </div>
+        """, 404
 
-
+    return render_template(
+        'background_verification.html',
+        verification=v
+    )
 @app.route('/api/submit-verification', methods=['POST'])
 def api_submit_verification():
-    """
-    Steps:
-      step=1  → Personal info (Aadhaar, PAN, phone)
-      step=2  → Education + DIGITAL SIGNATURE (uploaded as base64 image)
-      step=3  → Experience / fresher
-    """
     vid    = request.form.get('verification_id')
     verifs = get_verifs()
     v      = verifs.get(vid)
     if not v: return jsonify({'success':False}), 404
+    step   = request.form.get('step')
 
-    step = request.form.get('step')
-
-    if step == '1':
+    if step=='1':
         fn = request.form.get('first_name','')
         ln = request.form.get('last_name','')
-        v.update({
-            'first_name': fn, 'last_name': ln, 'name': f"{fn} {ln}",
-            'phone':   request.form.get('phone',''),
-            'aadhaar': request.form.get('aadhaar',''),
-            'pan':     request.form.get('pan',''),
-        })
-
-    elif step == '2':
-        # ── Education + Digital Signature ──────────────────────────────────
-        v.update({
-            'college':        request.form.get('college',''),
-            'specialization': request.form.get('specialization',''),
-            'percentage':     request.form.get('percentage',''),
-        })
-
-        # Digital signature: sent as base64 data URL from canvas
-        sig_data = request.form.get('digital_signature','')
-        if sig_data and sig_data.startswith('data:image'):
-            v['digital_signature'] = sig_data  # store full data URL
-        else:
-            v['digital_signature'] = ''
-
-    elif step == '3':
+        v.update({'first_name':fn,'last_name':ln,'name':f"{fn} {ln}",
+                  'phone':request.form.get('phone',''),
+                  'aadhaar':request.form.get('aadhaar',''),
+                  'pan':request.form.get('pan','')})
+    elif step=='2':
+        v.update({'college':request.form.get('college',''),
+                  'specialization':request.form.get('specialization',''),
+                  'percentage':request.form.get('percentage','')})
+    elif step=='3':
         ctype = request.form.get('candidate_type','fresher')
         v['candidate_type'] = ctype
-        users   = get_users()
-        hr      = users.get(v.get('hr_id',''), {})
-        company = hr.get('company_name','the company')
-
-        if ctype == 'experienced':
-            prev_co   = request.form.get('prev_company','')
-            prev_role = request.form.get('prev_role','')
-            co_email  = request.form.get('company_email','')
-            duration  = request.form.get('duration','')
-            v.update({
-                'prev_company': prev_co, 'prev_role': prev_role,
-                'company_email': co_email, 'duration': duration,
-            })
+        users = get_users(); hr = users.get(v.get('hr_id',''),{}); company=hr.get('company_name','the company')
+        if ctype=='experienced':
+            prev_co    = request.form.get('prev_company','')
+            prev_role  = request.form.get('prev_role','')
+            co_email   = request.form.get('company_email','')
+            duration   = request.form.get('duration','')
+            v.update({'prev_company':prev_co,'prev_role':prev_role,
+                      'company_email':co_email,'duration':duration})
             v['verification_status'] = 'pending'
-
             vlink = f"{BASE_URL}/company-verify/{vid}/verify"
             rlink = f"{BASE_URL}/company-verify/{vid}/reject"
-
             send_email(co_email,
                 f"Employment Verification — {v['name']}",
                 f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
@@ -1122,21 +906,21 @@ def api_submit_verification():
       <td style="padding-right:12px">
         <a href="{vlink}" style="display:inline-block;background:#10b981;color:#fff;
            padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">
-          ✓ Verify Employment</a>
+          ✓ Verify Employment
+        </a>
       </td>
       <td>
         <a href="{rlink}" style="display:inline-block;background:#ef4444;color:#fff;
            padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">
-          ✕ Cannot Verify</a>
+          ✕ Cannot Verify
+        </a>
       </td>
     </tr></table>
   </td></tr>
 </table></td></tr></table></body></html>""")
-
         else:
-            # Fresher → auto-verified
             v['verification_status'] = 'verified'
-            send_email(v['email'], '🎉 Background Verification Complete!',
+            send_email(v['email'],'🎉 Background Verification Complete!',
                 f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table width="500" style="background:#fff;border-radius:16px;overflow:hidden">
@@ -1152,26 +936,20 @@ def api_submit_verification():
     </p>
   </td></tr>
 </table></td></tr></table></body></html>""")
-
         v['submitted_at'] = str(datetime.now())
-
     save_verifs(verifs)
     return jsonify({'success':True,'status':v.get('verification_status')})
 
-
 @app.route('/company-verify/<vid>/<action>')
 def company_verify(vid, action):
-    verifs  = get_verifs()
-    v       = verifs.get(vid)
+    verifs = get_verifs()
+    v = verifs.get(vid)
     if not v:
-        return "<div style='font-family:sans-serif;text-align:center;margin-top:80px'><h2>Invalid link.</h2></div>", 404
-    users   = get_users()
-    hr      = users.get(v.get('hr_id',''), {})
-    company = hr.get('company_name','the company')
-
-    if action == 'verify':
-        v['verification_status'] = 'verified'
-        send_email(v['email'], '✅ Employment Verified — Welcome Aboard!',
+        return "<div style='font-family:sans-serif;text-align:center;margin-top:80px'><h2>Invalid link.</h2></div>",404
+    users = get_users(); hr = users.get(v.get('hr_id',''),{}); company=hr.get('company_name','the company')
+    if action=='verify':
+        v['verification_status']='verified'
+        send_email(v['email'],'✅ Employment Verified — Offer Letter Coming!',
             f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table width="500" style="background:#fff;border-radius:16px;overflow:hidden">
@@ -1187,10 +965,9 @@ def company_verify(vid, action):
     </p>
   </td></tr>
 </table></td></tr></table></body></html>""")
-
-    elif action == 'reject':
-        v['verification_status'] = 'rejected'
-        send_email(v['email'], 'Update on Your Application',
+    elif action=='reject':
+        v['verification_status']='rejected'
+        send_email(v['email'],'Update on Your Application',
             f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table width="500" style="background:#fff;border-radius:16px;overflow:hidden">
@@ -1206,10 +983,8 @@ def company_verify(vid, action):
     </p>
   </td></tr>
 </table></td></tr></table></body></html>""")
-
     save_verifs(verifs)
     return render_template('company_verify_done.html', action=action, candidate=v)
-
 
 @app.route('/api/download-template')
 def download_template():
@@ -1226,7 +1001,6 @@ def download_template():
     path = '/tmp/offers_export.xlsx'
     df.to_excel(path, index=False)
     return send_file(path, as_attachment=True, download_name='offers_export.xlsx')
-
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
