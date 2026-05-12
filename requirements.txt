@@ -1,0 +1,7 @@
+Flask 
+pandas
+pyPDF2
+reportlab
+openpyxl
+sib-api-v3-sdk
+python-dotenv
