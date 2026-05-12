@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.config['secret_key'] = os.environ.get("SECRET_KEY")
+app.secret_key = os.environ.get("SECRET_KEY")
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 SENDER_NAME = os.environ.get("SENDER_NAME")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
