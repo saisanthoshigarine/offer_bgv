@@ -18,15 +18,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY")
+app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret-key")
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 SENDER_NAME = os.environ.get("SENDER_NAME")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:5000")
 # ── Folders ───────────────────────────────────────────────────────────────────
-BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = "/tmp"
 UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
-DATA_DIR   = os.path.join(BASE_DIR, 'data')
+DATA_DIR = os.path.join(BASE_DIR, 'data')
 LETTER_DIR = os.path.join(BASE_DIR, 'generated_letters')
 for d in [UPLOAD_DIR+'/letterheads', UPLOAD_DIR+'/excel',
           UPLOAD_DIR+'/documents', DATA_DIR, LETTER_DIR]:
@@ -106,11 +106,6 @@ def send_email(to, subject, html_body, attach_path=None, attach_name=None):
     except Exception as e:
         print(f"[GENERAL EMAIL ERROR] → {e}")
         return False
-
-def send_async(to, subject, html, attach_path=None, attach_name=None):
-    threading.Thread(target=send_email,
-                     args=(to,subject,html,attach_path,attach_name),
-                     daemon=True).start()
 
 # ── PDF offer letter generator ─────────────────────────────────────────────────
 def generate_offer_pdf(candidate, hr_user):
@@ -243,39 +238,37 @@ def generate_offer_pdf(candidate, hr_user):
 
 
 def _merge_letterhead(lh_path, content_bytes, out_path):
-    
-    with open(out_path, 'wb') as f:
-        f.write(content_bytes)
     """
-    Overlay content PDF on letterhead using reportlab's canvas.
-    We read the letterhead as an image of page 1 and draw behind content.
-    Requires: pip install pdf2image pillow  (optional — fallback to plain)
+    Vercel-safe letterhead merge function.
+
+    Since Vercel serverless functions do not support Poppler/pdf2image
+    properly, this function safely writes the generated PDF content
+    directly without attempting PDF background merging.
+
+    Parameters:
+        lh_path (str): Path to company letterhead PDF
+        content_bytes (bytes): Generated offer letter PDF bytes
+        out_path (str): Final output PDF path
+
+    Returns:
+        str: Output PDF path
     """
+
     try:
-        from pdf2image import convert_from_path
-        from PIL import Image as PILImage
-        import tempfile
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
-        # Render letterhead page 1 to image
-        imgs = convert_from_path(lh_path, first_page=1, last_page=1, dpi=150)
-        if not imgs:
-            raise ValueError("No pages")
-        tmp_img = tempfile.mktemp(suffix='.png')
-        imgs[0].save(tmp_img, 'PNG')
+        # Write generated PDF directly
+        with open(out_path, "wb") as f:
+            f.write(content_bytes)
 
-        # Draw letterhead image + content on new PDF
-        from reportlab.pdfgen import canvas as rlc
-        c = rlc.Canvas(out_path, pagesize=A4)
-        w, h = A4
-        c.drawImage(tmp_img, 0, 0, width=w, height=h)
-        c.save()
+        print(f"[PDF GENERATED] → {out_path}")
 
-        # Now overlay content bytes using a simple approach
-        open(out_path,'wb').write(content_bytes)
-        os.unlink(tmp_img)
-    except ImportError:
-        # pdf2image not installed — write content as-is
-        open(out_path,'wb').write(content_bytes)
+        return out_path
+
+    except Exception as e:
+        print(f"[MERGE LETTERHEAD ERROR] → {e}")
+        return None
 
 
 def letterhead_preview_html(hr_user, candidate):
@@ -508,7 +501,7 @@ def api_forgot_password():
     <p style="color:#94a3b8;font-size:11px;margin-top:20px">If you did not request this, ignore this email.</p>
   </td></tr>
 </table></td></tr></table></body></html>"""
-    send_async(email, 'Reset Your OfferFlow Password', html)
+    send_email(email, 'Reset Your OfferFlow Password', html)
     return jsonify({'success':True,'message':'Password reset link sent to your email'})
 
 @app.route('/reset-password/<token>')
@@ -685,7 +678,7 @@ def api_send_offer_emails():
 
         subject = f"Job Offer — {c.get('role','')} at {u['company_name']}"
 
-        send_async(
+        send_email(
             c['email'],
             subject,
             offer_email_html(c, u, accept_link, decline_link),
@@ -792,7 +785,7 @@ def offer_response(cid, action):
             company = hr.get('company_name', 'the company')
 
             # Send ONLY ONCE
-            send_async(
+            send_email(
                 c['email'],
                 'Next Step: Complete Background Verification',
                 f"""
@@ -894,7 +887,7 @@ def api_submit_verification():
             v['verification_status'] = 'pending'
             vlink = f"{BASE_URL}/company-verify/{vid}/verify"
             rlink = f"{BASE_URL}/company-verify/{vid}/reject"
-            send_async(co_email,
+            send_email(co_email,
                 f"Employment Verification — {v['name']}",
                 f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
@@ -926,7 +919,7 @@ def api_submit_verification():
 </table></td></tr></table></body></html>""")
         else:
             v['verification_status'] = 'verified'
-            send_async(v['email'],'🎉 Background Verification Complete!',
+            send_email(v['email'],'🎉 Background Verification Complete!',
                 f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table width="500" style="background:#fff;border-radius:16px;overflow:hidden">
@@ -955,7 +948,7 @@ def company_verify(vid, action):
     users = get_users(); hr = users.get(v.get('hr_id',''),{}); company=hr.get('company_name','the company')
     if action=='verify':
         v['verification_status']='verified'
-        send_async(v['email'],'✅ Employment Verified — Offer Letter Coming!',
+        send_email(v['email'],'✅ Employment Verified — Offer Letter Coming!',
             f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table width="500" style="background:#fff;border-radius:16px;overflow:hidden">
@@ -973,7 +966,7 @@ def company_verify(vid, action):
 </table></td></tr></table></body></html>""")
     elif action=='reject':
         v['verification_status']='rejected'
-        send_async(v['email'],'Update on Your Application',
+        send_email(v['email'],'Update on Your Application',
             f"""<html><body style="font-family:Arial;margin:0;padding:32px 0;background:#f0f4fa">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table width="500" style="background:#fff;border-radius:16px;overflow:hidden">
