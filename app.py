@@ -14,6 +14,7 @@ from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
                                  Table, TableStyle, HRFlowable)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+import threading
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -68,6 +69,7 @@ def send_email(to, subject, html_body, attach_path=None, attach_name=None):
     try:
         configuration = sib_api_v3_sdk.Configuration()
         configuration.api_key['api-key'] = os.environ.get("BREVO_API_KEY")
+        configuration.timeout = 10
         api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
             sib_api_v3_sdk.ApiClient(configuration)
         )
@@ -785,41 +787,48 @@ def offer_response(cid, action):
             hr = users.get(c['hr_id'], {})
             company = hr.get('company_name', 'the company')
 
-            # Send ONLY ONCE
-            send_email(
-                c['email'],
-                'Next Step: Complete Background Verification',
-                f"""
-                <html>
-                <body style="font-family:Arial;padding:40px">
-                    <h2>Background Verification</h2>
+            # Send verification mail in background
+            def send_bg_mail():
 
-                    <p>Hello {c['name']},</p>
+                    send_email(
+                     c['email'],
+                    'Next Step: Complete Background Verification',
+                    f"""
+                    <html>
+                    <body style="font-family:Arial;padding:40px">
+                        <h2>Background Verification</h2>
 
-                    <p>
-                        Thank you for accepting the offer for
-                        <b>{c.get('role','')}</b>.
-                    </p>
+                        <p>Hello {c['name']},</p>
 
-                    <p>
-                        Please complete your background verification.
-                    </p>
+                        <p>
+                            Thank you for accepting the offer for
+                            <b>{c.get('role','')}</b>.
+                        </p>
 
-                    <a href="{bg_link}"
-                    style="
-                        background:#1a56db;
-                        color:white;
-                        padding:12px 24px;
-                        text-decoration:none;
-                        border-radius:8px;
-                        display:inline-block;
-                    ">
-                        Start Verification
-                    </a>
-                </body>
-                </html>
-                """
-            )
+                        <p>
+                            Please complete your background verification.
+                        </p>
+
+            <a href="{bg_link}"
+            style="
+                background:#1a56db;
+                color:white;
+                padding:12px 24px;
+                text-decoration:none;
+                border-radius:8px;
+                display:inline-block;
+            ">
+                Start Verification
+            </a>
+        </body>
+        </html>
+        """
+    )
+
+            threading.Thread(
+                target=send_bg_mail,
+                daemon=True
+            ).start()
 
         return render_template('offer_accepted.html', candidate=c)
 
