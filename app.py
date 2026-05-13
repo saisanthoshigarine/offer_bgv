@@ -828,6 +828,7 @@ def offer_response(cid, action):
         )
 
     if action == 'accept':
+        print(f"[DEBUG ACTION] accept hit for cid={cid}, current offer_status={c.get('offer_status')}")  # ← ADD THIS
         c['offer_status'] = 'accepted'
         c['responded_at'] = str(datetime.now())
         save_cands(cands)
@@ -885,7 +886,63 @@ def offer_response(cid, action):
         return render_template('offer_declined.html', candidate=c)
 
     return "<div style='font-family:sans-serif;text-align:center;margin-top:80px'><h2>Invalid action.</h2></div>"
+@app.route('/api/resend-bg-email/<cid>', methods=['POST'])
+def resend_bg_email(cid):
+    u = current_user()
+    if not u:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
 
+    cands = get_cands()
+    c = cands.get(cid)
+    if not c or c.get('hr_id') != u['id']:
+        return jsonify({'success': False, 'message': 'Candidate not found'}), 404
+
+    if c.get('offer_status') != 'accepted':
+        return jsonify({'success': False, 'message': 'Candidate has not accepted the offer'}), 400
+
+    verifs = get_verifs()
+    existing = next((v for v in verifs.values() if v.get('candidate_id') == cid), None)
+
+    if not existing:
+        vid = str(uuid.uuid4())
+        verifs[vid] = {
+            'id': vid,
+            'candidate_id': cid,
+            'hr_id': c['hr_id'],
+            'name': c['name'],
+            'email': c['email'],
+            'salary': c['salary'],
+            'phone': '',
+            'verification_status': 'pending',
+            'created_at': str(datetime.now()),
+            'bg_email_sent': False
+        }
+        save_verifs(verifs)
+        existing = verifs[vid]
+
+    vid = existing['id']
+    company = get_users().get(c['hr_id'], {}).get('company_name', 'the company')
+    bg_link = f"{BASE_URL.rstrip('/')}/background-verification/{vid}"
+
+    success = send_email(
+        c['email'],
+        f'Next Step: Complete Your Background Verification — {company}',
+        bg_verification_email_html(c, company, bg_link)
+    )
+
+    if success:
+        verifs = get_verifs()
+        if vid in verifs:
+            verifs[vid]['bg_email_sent'] = True
+            save_verifs(verifs)
+        return jsonify({'success': True, 'message': f'BG email sent to {c["email"]}'})
+    else:
+        return jsonify({'success': False, 'message': 'Email send failed — check Brevo logs'}), 500
+
+
+@app.route('/background-verification/<vid>')
+def background_verification_page(vid):
+    ...
 @app.route('/background-verification/<vid>')
 def background_verification_page(vid):
     verifs = get_verifs()
