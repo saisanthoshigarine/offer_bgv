@@ -850,17 +850,25 @@ def offer_response(cid, action):
             }
             save_verifs(verifs)
 
-            bg_link = f"{BASE_URL}/background-verification/{vid}"
-            users = get_users()
-            hr = users.get(c['hr_id'], {})
-            company = hr.get('company_name', 'the company')
+            # ── Safety checks before sending ──────────────────────────────
+            if not BASE_URL:
+                print(f"[BG EMAIL ERROR] BASE_URL is not set in .env — cannot build bg_link for {cid}")
+            else:
+                bg_link = f"{BASE_URL.rstrip('/')}/background-verification/{vid}"
+                users = get_users()
+                hr = users.get(c['hr_id'], {})
+                company = hr.get('company_name', 'the company')
 
-            # Send professional BG verification email IMMEDIATELY
-            send_email(
-                c['email'],
-                f'Next Step: Complete Your Background Verification — {company}',
-                bg_verification_email_html(c, company, bg_link)
-            )
+                print(f"[BG EMAIL] Sending to {c['email']} | link: {bg_link}")
+                success = send_email(
+                    c['email'],
+                    f'Next Step: Complete Your Background Verification — {company}',
+                    bg_verification_email_html(c, company, bg_link)
+                )
+                if not success:
+                    print(f"[BG EMAIL FAILED] Could not send BG email to {c['email']} for cid={cid}")
+        else:
+            print(f"[BG EMAIL SKIP] Verification record already exists for cid={cid}, vid={existing['id']}")
 
         return render_template('offer_accepted.html', candidate=c)
 
@@ -871,7 +879,6 @@ def offer_response(cid, action):
         return render_template('offer_declined.html', candidate=c)
 
     return "<div style='font-family:sans-serif;text-align:center;margin-top:80px'><h2>Invalid action.</h2></div>"
-
 
 @app.route('/background-verification/<vid>')
 def background_verification_page(vid):
