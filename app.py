@@ -25,7 +25,7 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 BASE_URL = os.environ.get("BASE_URL")
 
 # ── Folders ───────────────────────────────────────────────────────────────────
-BASE_DIR = "/tmp"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 LETTER_DIR = os.path.join(BASE_DIR, 'generated_letters')
@@ -38,7 +38,8 @@ def load_json(path):
     return json.load(open(path)) if os.path.exists(path) else {}
 
 def save_json(path, data):
-    json.dump(data, open(path,'w'), indent=2, default=str)
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2, default=str)
 
 USERS_F  = DATA_DIR+'/users.json'
 CANDS_F  = DATA_DIR+'/candidates.json'
@@ -1101,9 +1102,9 @@ def download_template():
             [{'Name':'','Gmail id':'','Role':'','Joining date':'','Salary':'',
               'Employment Type':'','Status':''}]
     df = pd.DataFrame(rows)
-    path = '/tmp/offers_export.xlsx'
+    path = os.path.join(BASE_DIR, 'offers_export.xlsx')
     df.to_excel(path, index=False)
     return send_file(path, as_attachment=True, download_name='offers_export.xlsx')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run()
