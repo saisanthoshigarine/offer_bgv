@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+{% block title %}Step 4: Preview & Send — OfferFlow{% endblock %}
+{% block head %}
+<style>
+:root { --step-active:#1a56db; --step-done:#10b981; }
+
+.flow-wrap { display:flex; min-height:100vh; background:var(--bg); }
+.flow-sidebar {
+  width:280px; flex-shrink:0; background:var(--navy);
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+}
+.flow-sidebar-head { padding:28px 24px 20px; border-bottom:1px solid rgba(255,255,255,.08); }
+.flow-logo { display:flex; align-items:center; gap:10px; color:#fff;
+  font-family:'DM Serif Display',serif; font-size:1.3rem; }
+.flow-logo-icon { width:38px; height:38px; background:linear-gradient(135deg,#0ea5e9,#6366f1);
+  border-radius:10px; display:flex; align-items:center; justify-content:center; }
+.step-nav { padding:24px 20px; flex:1; }
+.step-nav-title { font-size:.72rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.1em; color:rgba(255,255,255,.35); margin-bottom:16px; }
+.step-nav-item {
+  display:flex; align-items:center; gap:14px; padding:14px 16px;
+  border-radius:10px; margin-bottom:6px; color:rgba(255,255,255,.45);
+  font-size:.85rem; font-weight:500; border:1px solid transparent;
+}
+.step-nav-item.active { background:rgba(26,86,219,.2); color:#fff; border-color:rgba(26,86,219,.4); }
+.step-nav-item.done { color:rgba(16,185,129,.9); cursor:pointer; }
+.step-nav-item.done:hover { background:rgba(255,255,255,.05); }
+.step-nav-item.done .step-nav-num { background:var(--step-done); border-color:var(--step-done); color:#fff; }
+.step-nav-item.active .step-nav-num { background:var(--step-active); border-color:var(--step-active); color:#fff; }
+.step-nav-num {
+  width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,.2);
+  display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700; flex-shrink:0;
+}
+.step-nav-info { flex:1; }
+.step-nav-label { font-weight:600; }
+.step-nav-sub { font-size:.75rem; opacity:.65; }
+
+.flow-main { flex:1; overflow-y:auto; }
+.flow-topbar {
+  background:#fff; border-bottom:1px solid var(--border); padding:18px 40px;
+  display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10;
+}
+.flow-topbar h1 { font-family:'DM Serif Display',serif; font-size:1.35rem; color:var(--navy); margin:0; }
+.flow-content { padding:40px; }
+
+.progress-bar-wrap {
+  background:#fff; border-radius:12px; border:1px solid var(--border);
+  padding:20px 28px; margin-bottom:32px; display:flex; align-items:center;
+}
+.progress-step { display:flex; align-items:center; flex:1; }
+.progress-step-circle {
+  width:36px; height:36px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-weight:700; font-size:.85rem; flex-shrink:0; border:2px solid transparent;
+}
+.progress-step-circle.active { background:var(--step-active); color:#fff; box-shadow:0 0 0 4px rgba(26,86,219,.15); }
+.progress-step-circle.done { background:var(--step-done); color:#fff; }
+.progress-step-circle.inactive { background:#f1f5f9; color:#94a3b8; border-color:var(--border); }
+.progress-step-info { margin-left:12px; }
+.progress-step-name { font-size:.83rem; font-weight:700; color:var(--navy); }
+.progress-step-name.inactive { color:var(--muted); }
+.progress-step-sub { font-size:.72rem; color:var(--muted); }
+.progress-line { flex:1; height:2px; background:var(--border); margin:0 12px; }
+.progress-line.done { background:var(--step-done); }
+
+/* Layout */
+.preview-layout { display:grid; grid-template-columns:260px 1fr; gap:24px; min-height:600px; }
+
+/* Candidate list */
+.cand-panel {
+  background:#fff; border-radius:14px; border:1px solid var(--border);
+  display:flex; flex-direction:column; max-height:700px;
+}
+.cand-panel-head {
+  padding:16px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.cand-panel-head h3 { font-size:.88rem; font-weight:700; color:var(--navy); margin:0; }
+.cand-count-badge {
+  background:#f0f4ff; color:var(--blue); border-radius:20px;
+  padding:2px 10px; font-size:.75rem; font-weight:700;
+}
+.cand-list { overflow-y:auto; flex:1; }
+.cand-item {
+  display:flex; align-items:center; gap:12px; padding:12px 16px;
+  border-bottom:1px solid #f5f7fa; cursor:pointer; transition:background .15s;
+}
+.cand-item:hover { background:#f8faff; }
+.cand-item.active { background:#f0f4ff; border-right:3px solid var(--blue); }
+.cand-avatar {
+  width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#1a56db,#0ea5e9);
+  display:flex; align-items:center; justify-content:center; color:#fff;
+  font-weight:700; font-size:.85rem; flex-shrink:0;
+}
+.cand-info { flex:1; min-width:0; }
+.cand-name { font-weight:600; font-size:.85rem; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cand-role { font-size:.75rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Preview pane */
+.preview-pane { background:#fff; border-radius:14px; border:1px solid var(--border); display:flex; flex-direction:column; }
+.preview-pane-topbar {
+  padding:16px 24px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.preview-pane-topbar h3 { font-size:.9rem; font-weight:700; color:var(--navy); margin:0; }
+.preview-tags { display:flex; gap:8px; }
+.preview-tag {
+  background:#f0f4ff; color:var(--blue); border:1px solid #c7d7ff;
+  padding:4px 10px; border-radius:6px; font-size:.75rem; font-weight:600;
+}
+.preview-body { padding:24px; overflow-y:auto; flex:1; }
+.preview-empty {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:80px 40px; text-align:center; color:var(--muted);
+}
+.preview-empty-icon { font-size:3rem; margin-bottom:16px; opacity:.4; }
+
+/* Loading skeleton */
+.preview-skeleton { display:none; }
+.preview-skeleton.show { display:block; }
+.skel { background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);
+  background-size:200% 100%; animation:skel 1.5s infinite; border-radius:6px; }
+@keyframes skel { 0%{background-position:200%} 100%{background-position:-200%} }
+
+/* Send banner */
+.send-banner {
+  background:#fff; border-top:1px solid var(--border);
+  padding:20px 40px; display:flex; align-items:center; justify-content:space-between;
+  position:sticky; bottom:0; z-index:10;
+}
+.send-banner-info { font-size:.85rem; color:var(--muted); }
+.send-banner-info b { color:var(--navy); }
+
+/* Summary bar */
+.summary-bar {
+  background:linear-gradient(135deg,#0d1b3e,#1a56db); border-radius:12px;
+  padding:16px 24px; margin-bottom:24px; display:flex; align-items:center; gap:20px; color:#fff;
+  flex-wrap:wrap;
+}
+.summary-item { display:flex; align-items:center; gap:8px; }
+.summary-label { font-size:.78rem; color:rgba(255,255,255,.6); }
+.summary-value { font-size:.88rem; font-weight:700; }
+.summary-divider { width:1px; height:28px; background:rgba(255,255,255,.15); }
+</style>
+{% endblock %}
+{% block body %}
+<div class="flow-wrap">
+  <div class="flow-sidebar">
+    <div class="flow-sidebar-head">
+      <div class="flow-logo">
+        <div class="flow-logo-icon"><i class="fas fa-file-contract" style="color:#fff;font-size:.95rem"></i></div>
+        OfferFlow
+      </div>
+    </div>
+    <div class="step-nav">
+      <div class="step-nav-title">Upload Wizard</div>
+      <div class="step-nav-item done" onclick="location.href='/upload-excel'">
+        <div class="step-nav-num"><i class="fas fa-check" style="font-size:.65rem"></i></div>
+        <div class="step-nav-info"><div class="step-nav-label">Upload Excel</div><div class="step-nav-sub">Completed</div></div>
+      </div>
+      <div class="step-nav-item done" onclick="location.href='/step/employment-type'">
+        <div class="step-nav-num"><i class="fas fa-check" style="font-size:.65rem"></i></div>
+        <div class="step-nav-info"><div class="step-nav-label">Employment Type</div><div class="step-nav-sub">Completed</div></div>
+      </div>
+      <div class="step-nav-item done" onclick="location.href='/step/pattern'">
+        <div class="step-nav-num"><i class="fas fa-check" style="font-size:.65rem"></i></div>
+        <div class="step-nav-info"><div class="step-nav-label">Letter Pattern</div><div class="step-nav-sub">Completed</div></div>
+      </div>
+      <div class="step-nav-item active">
+        <div class="step-nav-num">4</div>
+        <div class="step-nav-info"><div class="step-nav-label">Preview & Send</div><div class="step-nav-sub">Review & dispatch</div></div>
+      </div>
+    </div>
+    <div style="padding:20px 24px;border-top:1px solid rgba(255,255,255,.08)">
+      <a href="/dashboard" style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.5);font-size:.83rem;text-decoration:none">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="flow-main">
+    <div class="flow-topbar">
+      <h1>Preview & Send Offer Letters</h1>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="location.href='/step/pattern'">
+          <i class="fas fa-arrow-left"></i> Back
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="location.href='/logout'">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+
+    <div class="flow-content">
+      <div class="progress-bar-wrap">
+        <div class="progress-step">
+          <div class="progress-step-circle done"><i class="fas fa-check" style="font-size:.7rem"></i></div>
+          <div class="progress-step-info"><div class="progress-step-name">Upload</div><div class="progress-step-sub">Completed</div></div>
+        </div>
+        <div class="progress-line done"></div>
+        <div class="progress-step">
+          <div class="progress-step-circle done"><i class="fas fa-check" style="font-size:.7rem"></i></div>
+          <div class="progress-step-info"><div class="progress-step-name">Employment</div><div class="progress-step-sub">Completed</div></div>
+        </div>
+        <div class="progress-line done"></div>
+        <div class="progress-step">
+          <div class="progress-step-circle done"><i class="fas fa-check" style="font-size:.7rem"></i></div>
+          <div class="progress-step-info"><div class="progress-step-name">Pattern</div><div class="progress-step-sub">Completed</div></div>
+        </div>
+        <div class="progress-line done"></div>
+        <div class="progress-step">
+          <div class="progress-step-circle active">4</div>
+          <div class="progress-step-info"><div class="progress-step-name">Preview & Send</div><div class="progress-step-sub">Final step</div></div>
+        </div>
+      </div>
+
+      <!-- Summary bar -->
+      <div class="summary-bar" id="summaryBar"></div>
+
+      <!-- Preview layout -->
+      <div class="preview-layout">
+        <!-- Candidate list -->
+        <div class="cand-panel">
+          <div class="cand-panel-head">
+            <h3>Candidates</h3>
+            <span class="cand-count-badge" id="candCount">0</span>
+          </div>
+          <div class="cand-list" id="candList"></div>
+        </div>
+
+        <!-- Preview pane -->
+        <div class="preview-pane">
+          <div class="preview-pane-topbar">
+            <h3 id="previewTitle">Select a candidate</h3>
+            <div class="preview-tags" id="previewTags"></div>
+          </div>
+          <div class="preview-body" id="previewBody">
+            <div class="preview-empty">
+              <div class="preview-empty-icon">📄</div>
+              <div style="font-weight:600;color:var(--navy);margin-bottom:6px">No preview yet</div>
+              <div style="font-size:.83rem">Select a candidate from the list to preview their offer letter with your company letterhead</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send banner -->
+    <div class="send-banner">
+      <div class="send-banner-info">
+        <b id="sendCount">0 candidates</b> ready to receive offer emails · Letters will include PDF attachment &amp; accept/decline buttons
+      </div>
+      <div style="display:flex;gap:12px">
+        <button class="btn btn-ghost" onclick="location.href='/step/pattern'">
+          <i class="fas fa-arrow-left"></i> Back
+        </button>
+        <button class="btn btn-success" id="sendBtn" onclick="saveAndSend()">
+          <i class="fas fa-paper-plane"></i> Save & Send All Emails
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let candidates = [];
+let empType = 'full_time';
+let pattern = 'standard';
+let customBody = '';
+let currentIdx = null;
+
+const EMP_LABELS = {
+  full_time: '💼 Full Time',
+  part_time: '⏰ Part Time',
+  internship: '🎓 Internship',
+};
+const PATTERN_LABELS = {
+  standard: '📋 Standard',
+  modern: '✦ Modern',
+  formal: '⚖️ Formal',
+  detailed: '📊 Detailed',
+  custom: '✏️ Custom',
+};
+
+function init() {
+  const raw = sessionStorage.getItem('of_candidates');
+  if (!raw) {
+    showToast('Please start from Step 1', 'error');
+    setTimeout(() => location.href = '/upload-excel', 1500);
+    return;
+  }
+  candidates = JSON.parse(raw);
+  empType = sessionStorage.getItem('of_emp_type') || 'full_time';
+  pattern = sessionStorage.getItem('of_pattern') || 'standard';
+  customBody = sessionStorage.getItem('of_custom_body') || '';
+
+  // Summary bar
+  document.getElementById('summaryBar').innerHTML = `
+    <div class="summary-item">
+      <div><div class="summary-label">Candidates</div><div class="summary-value">${candidates.length}</div></div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-item">
+      <div><div class="summary-label">Employment Type</div><div class="summary-value">${EMP_LABELS[empType]||empType}</div></div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-item">
+      <div><div class="summary-label">Letter Pattern</div><div class="summary-value">${PATTERN_LABELS[pattern]||pattern}</div></div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-item">
+      <div><div class="summary-label">PDF Attachment</div><div class="summary-value">✓ Included</div></div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-item">
+      <div><div class="summary-label">Letterhead</div><div class="summary-value">✓ Company letterhead</div></div>
+    </div>
+  `;
+
+  document.getElementById('candCount').textContent = candidates.length;
+  document.getElementById('sendCount').textContent = `${candidates.length} candidate${candidates.length!==1?'s':''}`;
+
+  // Render candidate list
+  document.getElementById('candList').innerHTML = candidates.map((c, i) => `
+    <div class="cand-item" id="citem-${i}" onclick="previewLetter(${i})">
+      <div class="cand-avatar">${(c['Name']||'?')[0].toUpperCase()}</div>
+      <div class="cand-info">
+        <div class="cand-name">${c['Name']||'—'}</div>
+        <div class="cand-role">${c['Role']||'—'}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Auto-preview first
+  if (candidates.length > 0) {
+    previewLetter(0);
+  }
+}
+
+async function previewLetter(idx) {
+  currentIdx = idx;
+  const c = candidates[idx];
+
+  // Highlight active
+  document.querySelectorAll('.cand-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('citem-' + idx).classList.add('active');
+
+  document.getElementById('previewTitle').textContent = c['Name'] || '—';
+  document.getElementById('previewTags').innerHTML = `
+    <span class="preview-tag">${c['Role']||'—'}</span>
+    <span class="preview-tag">₹${c['Salary']||'—'}</span>
+  `;
+
+  // Show skeleton
+  document.getElementById('previewBody').innerHTML = `
+    <div style="padding:8px">
+      <div class="skel" style="height:160px;margin-bottom:16px;border-radius:10px"></div>
+      <div class="skel" style="height:20px;width:60%;margin-bottom:10px"></div>
+      <div class="skel" style="height:14px;width:90%;margin-bottom:8px"></div>
+      <div class="skel" style="height:14px;width:80%;margin-bottom:8px"></div>
+      <div class="skel" style="height:14px;width:70%;margin-bottom:20px"></div>
+      <div class="skel" style="height:120px;margin-bottom:16px;border-radius:8px"></div>
+      <div class="skel" style="height:14px;width:85%;margin-bottom:8px"></div>
+      <div class="skel" style="height:14px;width:75%"></div>
+    </div>
+  `;
+
+  try {
+    const resp = await fetch('/api/preview-letter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        candidate: {
+          name: c['Name'] || '',
+          email: c['Gmail id'] || '',
+          role: c['Role'] || '',
+          joining_date: String(c['Joining date'] || ''),
+          salary: String(c['Salary'] || ''),
+          custom_body: customBody,
+        },
+        employment_type: empType,
+        pattern: pattern,
+        custom_body: customBody,
+      }),
+    });
+    const d = await resp.json();
+    if (d.success) {
+      document.getElementById('previewBody').innerHTML = d.html;
+    } else {
+      document.getElementById('previewBody').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">Failed to load preview</div>';
+    }
+  } catch(e) {
+    document.getElementById('previewBody').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">Preview error</div>';
+  }
+}
+
+async function saveAndSend() {
+  if (!candidates.length) { showToast('No candidates loaded', 'error'); return; }
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving candidates…';
+  showLoading();
+
+  // 1. Save candidates
+  const saveResp = await fetch('/api/save-candidates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      candidates,
+      employment_type: empType,
+      pattern: pattern,
+      custom_body: customBody,
+    }),
+  });
+  const saveData = await saveResp.json();
+  if (!saveData.success) {
+    hideLoading();
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Save & Send All Emails';
+    showToast('Error saving candidates', 'error');
+    return;
+  }
+
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending emails…';
+
+  // 2. Get fresh pending offers for this HR
+  const offersResp = await fetch('/api/offers?status=pending');
+  const offers = await offersResp.json();
+  const ids = offers.map(o => o.id);
+
+  // 3. Send emails
+  const sendResp = await fetch('/api/send-offer-emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ candidate_ids: ids }),
+  });
+  const sendData = await sendResp.json();
+  hideLoading();
+
+  if (sendData.success) {
+    // Clear session state
+    ['of_candidates','of_emp_type','of_pattern','of_custom_body','of_extra_cols','of_all_cols']
+      .forEach(k => sessionStorage.removeItem(k));
+
+    showToast(`✅ ${sendData.sent} offer email${sendData.sent!==1?'s':''} sent successfully!`);
+    setTimeout(() => location.href = '/dashboard', 1800);
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Save & Send All Emails';
+    showToast('Error sending emails', 'error');
+  }
+}
+
+init();
+</script>
+{% endblock %}

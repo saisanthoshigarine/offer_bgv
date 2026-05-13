@@ -1,0 +1,386 @@
+{% extends 'base.html' %}
+{% block title %}Step 1: Upload Excel — OfferFlow{% endblock %}
+{% block head %}
+<style>
+:root { --step-active:#1a56db; --step-done:#10b981; --step-inactive:#e2e8f0; }
+
+.flow-wrap { display:flex; min-height:100vh; background:var(--bg); }
+.flow-sidebar {
+  width:280px; flex-shrink:0; background:var(--navy);
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+}
+.flow-sidebar-head { padding:28px 24px 20px; border-bottom:1px solid rgba(255,255,255,.08); }
+.flow-logo { display:flex; align-items:center; gap:10px; color:#fff;
+  font-family:'DM Serif Display',serif; font-size:1.3rem; }
+.flow-logo-icon { width:38px; height:38px; background:linear-gradient(135deg,#0ea5e9,#6366f1);
+  border-radius:10px; display:flex; align-items:center; justify-content:center; }
+
+.step-nav { padding:24px 20px; flex:1; }
+.step-nav-title { font-size:.72rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.1em; color:rgba(255,255,255,.35); margin-bottom:16px; }
+.step-nav-item {
+  display:flex; align-items:center; gap:14px; padding:14px 16px;
+  border-radius:10px; margin-bottom:6px; color:rgba(255,255,255,.45);
+  font-size:.85rem; font-weight:500; transition:all .2s; cursor:default;
+  border:1px solid transparent;
+}
+.step-nav-item.active {
+  background:rgba(26,86,219,.2); color:#fff; border-color:rgba(26,86,219,.4);
+}
+.step-nav-item.done { color:rgba(16,185,129,.9); }
+.step-nav-item.done .step-nav-num { background:var(--step-done); border-color:var(--step-done); }
+.step-nav-item.active .step-nav-num { background:var(--step-active); border-color:var(--step-active); color:#fff; }
+.step-nav-num {
+  width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,.2);
+  display:flex; align-items:center; justify-content:center; font-size:.8rem;
+  font-weight:700; flex-shrink:0; transition:all .3s;
+}
+.step-nav-info { flex:1; }
+.step-nav-label { font-weight:600; line-height:1.2; }
+.step-nav-sub { font-size:.75rem; margin-top:2px; opacity:.65; }
+
+.flow-main { flex:1; overflow-y:auto; }
+.flow-topbar {
+  background:#fff; border-bottom:1px solid var(--border); padding:18px 40px;
+  display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10;
+}
+.flow-topbar h1 { font-family:'DM Serif Display',serif; font-size:1.35rem; color:var(--navy); margin:0; }
+.flow-topbar-actions { display:flex; gap:10px; }
+
+.flow-content { padding:40px; max-width:820px; }
+
+/* Progress bar at top */
+.progress-bar-wrap {
+  background:#fff; border-radius:12px; border:1px solid var(--border);
+  padding:20px 28px; margin-bottom:32px; display:flex; align-items:center; gap:0;
+}
+.progress-step { display:flex; align-items:center; flex:1; }
+.progress-step-circle {
+  width:36px; height:36px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-weight:700; font-size:.85rem; flex-shrink:0; transition:all .3s;
+  border:2px solid transparent;
+}
+.progress-step-circle.active { background:var(--step-active); color:#fff; box-shadow:0 0 0 4px rgba(26,86,219,.15); }
+.progress-step-circle.done { background:var(--step-done); color:#fff; }
+.progress-step-circle.inactive { background:#f1f5f9; color:#94a3b8; border-color:var(--border); }
+.progress-step-info { margin-left:12px; }
+.progress-step-name { font-size:.83rem; font-weight:700; color:var(--navy); }
+.progress-step-name.inactive { color:var(--muted); }
+.progress-step-sub { font-size:.72rem; color:var(--muted); }
+.progress-line { flex:1; height:2px; background:var(--border); margin:0 12px; }
+.progress-line.done { background:var(--step-done); }
+
+/* Card */
+.card { background:#fff; border-radius:14px; border:1px solid var(--border); overflow:hidden; }
+.card-header { padding:22px 28px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+.card-header-icon {
+  width:42px; height:42px; border-radius:10px; display:flex; align-items:center;
+  justify-content:center; font-size:1.1rem; flex-shrink:0;
+}
+.card-header h2 { font-family:'DM Serif Display',serif; font-size:1.15rem; color:var(--navy); margin:0; }
+.card-header p { font-size:.82rem; color:var(--muted); margin:3px 0 0; }
+.card-body { padding:28px; }
+
+/* Required cols */
+.cols-badge-wrap { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px; }
+.col-badge {
+  background:#f0f4ff; border:1px solid #c7d7ff; color:#1a56db;
+  padding:5px 12px; border-radius:6px; font-size:.78rem; font-weight:600; font-family:monospace;
+}
+.col-badge.optional { background:#f0fdf4; border-color:#bbf7d0; color:#15803d; }
+
+/* Dropzone */
+.dropzone {
+  border:2px dashed #c7d7ff; border-radius:14px; padding:56px 40px;
+  text-align:center; cursor:pointer; transition:all .3s; background:#f8faff;
+  position:relative;
+}
+.dropzone:hover, .dropzone.drag {
+  border-color:var(--blue); background:#eef2ff;
+  box-shadow:0 0 0 4px rgba(26,86,219,.08);
+}
+.dropzone-icon {
+  width:72px; height:72px; background:linear-gradient(135deg,#e0f2fe,#dbeafe);
+  border-radius:18px; display:flex; align-items:center; justify-content:center;
+  margin:0 auto 20px; font-size:2rem;
+}
+.dropzone h3 { font-size:1.05rem; font-weight:700; color:var(--navy); margin:0 0 8px; }
+.dropzone p { color:var(--muted); font-size:.85rem; margin:0 0 16px; }
+.dropzone-or {
+  display:inline-flex; align-items:center; gap:10px; color:var(--muted);
+  font-size:.8rem; margin-bottom:16px;
+}
+.dropzone-or::before, .dropzone-or::after {
+  content:''; width:40px; height:1px; background:var(--border); display:block;
+}
+.browse-btn {
+  display:inline-flex; align-items:center; gap:8px; background:var(--blue);
+  color:#fff; padding:10px 22px; border-radius:8px; font-size:.85rem; font-weight:600;
+  cursor:pointer; transition:opacity .2s;
+}
+.browse-btn:hover { opacity:.85; }
+
+/* Success state */
+.upload-success {
+  background:linear-gradient(135deg,#f0fdf4,#dcfce7); border:1px solid #86efac;
+  border-radius:12px; padding:20px 24px; margin-top:20px; display:none;
+}
+.upload-success.show { display:flex; align-items:flex-start; gap:14px; }
+.success-icon { font-size:1.8rem; flex-shrink:0; }
+.success-info h4 { font-weight:700; color:#15803d; margin:0 0 4px; }
+.success-info p { color:#166534; font-size:.85rem; margin:0 0 10px; }
+
+/* Candidate preview table */
+.cand-preview { margin-top:24px; border-radius:10px; overflow:hidden; border:1px solid var(--border); display:none; }
+.cand-preview.show { display:block; }
+.cand-preview table { width:100%; border-collapse:collapse; font-size:.83rem; }
+.cand-preview thead tr { background:var(--navy); }
+.cand-preview thead th { color:#fff; padding:10px 14px; text-align:left; font-weight:600; }
+.cand-preview tbody tr:nth-child(even) { background:#f8faff; }
+.cand-preview tbody td { padding:10px 14px; color:var(--navy); border-bottom:1px solid var(--border); }
+.cand-preview-footer {
+  padding:12px 16px; background:#f8faff; border-top:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center; font-size:.82rem; color:var(--muted);
+}
+
+.nav-actions { display:flex; justify-content:flex-end; margin-top:24px; }
+</style>
+{% endblock %}
+{% block body %}
+<div class="flow-wrap">
+  <!-- Sidebar -->
+  <div class="flow-sidebar">
+    <div class="flow-sidebar-head">
+      <div class="flow-logo">
+        <div class="flow-logo-icon"><i class="fas fa-file-contract" style="color:#fff;font-size:.95rem"></i></div>
+        OfferFlow
+      </div>
+    </div>
+    <div class="step-nav">
+      <div class="step-nav-title">Upload Wizard</div>
+      <div class="step-nav-item active">
+        <div class="step-nav-num">1</div>
+        <div class="step-nav-info">
+          <div class="step-nav-label">Upload Excel</div>
+          <div class="step-nav-sub">Import candidate data</div>
+        </div>
+      </div>
+      <div class="step-nav-item">
+        <div class="step-nav-num">2</div>
+        <div class="step-nav-info">
+          <div class="step-nav-label">Employment Type</div>
+          <div class="step-nav-sub">Full time, part time…</div>
+        </div>
+      </div>
+      <div class="step-nav-item">
+        <div class="step-nav-num">3</div>
+        <div class="step-nav-info">
+          <div class="step-nav-label">Letter Pattern</div>
+          <div class="step-nav-sub">Choose layout & tone</div>
+        </div>
+      </div>
+      <div class="step-nav-item">
+        <div class="step-nav-num">4</div>
+        <div class="step-nav-info">
+          <div class="step-nav-label">Preview & Send</div>
+          <div class="step-nav-sub">Review & dispatch emails</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px 24px;border-top:1px solid rgba(255,255,255,.08)">
+      <a href="/dashboard" style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.5);font-size:.83rem;text-decoration:none;transition:color .2s">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="flow-main">
+    <div class="flow-topbar">
+      <h1>Upload Candidate Data</h1>
+      <div class="flow-topbar-actions">
+        <button class="btn btn-ghost btn-sm" onclick="location.href='/api/download-template'">
+          <i class="fas fa-download"></i> Export Template
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="location.href='/logout'">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+
+    <div class="flow-content">
+      <!-- Progress bar -->
+      <div class="progress-bar-wrap">
+        <div class="progress-step">
+          <div class="progress-step-circle active">1</div>
+          <div class="progress-step-info">
+            <div class="progress-step-name">Upload</div>
+            <div class="progress-step-sub">Import Excel</div>
+          </div>
+        </div>
+        <div class="progress-line"></div>
+        <div class="progress-step">
+          <div class="progress-step-circle inactive">2</div>
+          <div class="progress-step-info">
+            <div class="progress-step-name inactive">Employment</div>
+            <div class="progress-step-sub">Type selection</div>
+          </div>
+        </div>
+        <div class="progress-line"></div>
+        <div class="progress-step">
+          <div class="progress-step-circle inactive">3</div>
+          <div class="progress-step-info">
+            <div class="progress-step-name inactive">Pattern</div>
+            <div class="progress-step-sub">Letter layout</div>
+          </div>
+        </div>
+        <div class="progress-line"></div>
+        <div class="progress-step">
+          <div class="progress-step-circle inactive">4</div>
+          <div class="progress-step-info">
+            <div class="progress-step-name inactive">Preview & Send</div>
+            <div class="progress-step-sub">Dispatch emails</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-icon" style="background:#eef2ff"><i class="fas fa-file-excel" style="color:#1a56db"></i></div>
+          <div>
+            <h2>Import Candidate Excel File</h2>
+            <p>Upload a .xlsx file with candidate details — all offer letters will be generated from this data</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Required columns info -->
+          <div style="margin-bottom:24px">
+            <div style="font-size:.82rem;font-weight:700;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+              <i class="fas fa-info-circle" style="color:var(--blue)"></i> Required columns
+            </div>
+            <div class="cols-badge-wrap">
+              <span class="col-badge">Name</span>
+              <span class="col-badge">Gmail id</span>
+              <span class="col-badge">Role</span>
+              <span class="col-badge">Joining date</span>
+              <span class="col-badge">Salary</span>
+              <span class="col-badge optional">+ Any additional columns</span>
+            </div>
+            <div style="font-size:.78rem;color:var(--muted)">Additional columns (Department, Phone, etc.) are stored and available for custom letter templates.</div>
+          </div>
+
+          <!-- Dropzone -->
+          <div class="dropzone" id="dropzone"
+               onclick="document.getElementById('fileInput').click()"
+               ondragover="handleDrag(event,true)"
+               ondragleave="handleDrag(event,false)"
+               ondrop="handleDrop(event)">
+            <div class="dropzone-icon">📊</div>
+            <h3>Drop your Excel file here</h3>
+            <p>Drag & drop your .xlsx file or click to browse</p>
+            <div class="dropzone-or">or</div>
+            <div class="browse-btn"><i class="fas fa-folder-open"></i> Browse File</div>
+          </div>
+          <input type="file" id="fileInput" accept=".xlsx" style="display:none" onchange="handleFile(this.files[0])">
+
+          <!-- Success block -->
+          <div class="upload-success" id="uploadSuccess">
+            <div class="success-icon">✅</div>
+            <div class="success-info">
+              <h4 id="successTitle">0 candidates loaded</h4>
+              <p id="successDesc">Columns detected</p>
+            </div>
+          </div>
+
+          <!-- Preview table -->
+          <div class="cand-preview" id="candPreview">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Joining Date</th><th>Salary</th>
+              </tr></thead>
+              <tbody id="previewTbody"></tbody>
+            </table>
+            <div class="cand-preview-footer">
+              <span id="previewCount"></span>
+              <span style="color:var(--blue);font-weight:600">✓ Data validated</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <button class="btn btn-primary" id="nextBtn" style="display:none" onclick="goNext()">
+          Next: Employment Type <i class="fas fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let uploadedCandidates = [];
+let extraColumns = [];
+
+function handleDrag(e, on) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.toggle('drag', on);
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  handleFile(e.dataTransfer.files[0]);
+}
+
+async function handleFile(file) {
+  if (!file || !file.name.endsWith('.xlsx')) {
+    showToast('Please select a .xlsx file', 'error'); return;
+  }
+  const fd = new FormData();
+  fd.append('file', file);
+  showLoading();
+  const r = await fetch('/api/upload-excel', { method: 'POST', body: fd });
+  hideLoading();
+  const d = await r.json();
+  if (!d.success) { showToast(d.message, 'error'); return; }
+
+  uploadedCandidates = d.records;
+  extraColumns = d.extra_columns || [];
+
+  // Store in sessionStorage for other steps
+  sessionStorage.setItem('of_candidates', JSON.stringify(uploadedCandidates));
+  sessionStorage.setItem('of_extra_cols', JSON.stringify(extraColumns));
+  sessionStorage.setItem('of_all_cols', JSON.stringify(d.columns));
+
+  // Show success
+  const s = document.getElementById('uploadSuccess');
+  s.classList.add('show');
+  document.getElementById('successTitle').textContent = `${d.records.length} candidate${d.records.length!==1?'s':''} loaded`;
+  document.getElementById('successDesc').textContent = `Columns: ${d.columns.join(', ')}`;
+
+  // Fill preview table
+  const tbody = document.getElementById('previewTbody');
+  tbody.innerHTML = d.records.slice(0, 5).map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><b>${r['Name']||'—'}</b></td>
+      <td>${r['Gmail id']||'—'}</td>
+      <td>${r['Role']||'—'}</td>
+      <td>${r['Joining date']||'—'}</td>
+      <td>₹${r['Salary']||'—'}</td>
+    </tr>
+  `).join('');
+  document.getElementById('previewCount').textContent =
+    `Showing ${Math.min(5,d.records.length)} of ${d.records.length} candidates`;
+  document.getElementById('candPreview').classList.add('show');
+  document.getElementById('nextBtn').style.display = 'inline-flex';
+  showToast(`${d.records.length} candidates imported!`);
+}
+
+function goNext() {
+  if (!uploadedCandidates.length) { showToast('Please upload a file first','error'); return; }
+  location.href = '/step/employment-type';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Step 3: Choose Pattern — OfferFlow</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:        #0a0e1a;
+  --ink-2:      #3d4460;
+  --ink-3:      #8891aa;
+  --bg:         #f4f6fb;
+  --surface:    #ffffff;
+  --border:     #e3e7f0;
+  --border-2:   #c8cedf;
+  --accent:     #2563eb;
+  --accent-d:   #1d4ed8;
+  --accent-s:   #eff4ff;
+  --green:      #059669;
+  --green-s:    #ecfdf5;
+  --sidebar-bg: #0d1525;
+  --sidebar-w:  252px;
+  --topbar-h:   62px;
+  --r:          8px;
+  --r-lg:       14px;
+  --shadow-sm:  0 1px 3px rgba(10,14,26,.06), 0 1px 2px rgba(10,14,26,.03);
+  --shadow:     0 4px 18px rgba(10,14,26,.08), 0 1px 4px rgba(10,14,26,.04);
+}
+
+html, body { height: 100%; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--ink); }
+
+/* ── Shell ── */
+.shell { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 200;
+}
+
+.sb-logo {
+  padding: 22px 20px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  display: flex; align-items: center; gap: 10px;
+}
+.sb-logo-mark {
+  width: 34px; height: 34px;
+  background: var(--accent);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.sb-logo-mark i { color: #fff; font-size: 15px; }
+.sb-logo-text {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.18rem; color: #fff; letter-spacing: -.01em;
+}
+
+.sb-section {
+  padding: 20px 20px 10px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .11em; text-transform: uppercase;
+  color: rgba(255,255,255,.22);
+}
+
+.sb-steps { padding: 0 10px; flex: 1; }
+
+.sb-step {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 10px;
+  border-radius: 8px; margin-bottom: 1px;
+  cursor: default; transition: background .15s;
+}
+.sb-step.done { cursor: pointer; }
+.sb-step.done:hover { background: rgba(255,255,255,.05); }
+.sb-step.active { background: rgba(37,99,235,.17); }
+
+.sb-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,.13);
+  color: rgba(255,255,255,.22);
+}
+.sb-step.done .sb-num  { background: var(--green); border-color: var(--green); color: #fff; }
+.sb-step.active .sb-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.sb-meta { flex: 1; min-width: 0; }
+.sb-name {
+  font-size: 12.5px; font-weight: 600;
+  color: rgba(255,255,255,.28);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sb-step.done .sb-name   { color: rgba(255,255,255,.65); }
+.sb-step.active .sb-name { color: #fff; }
+.sb-sub { font-size: 10.5px; color: rgba(255,255,255,.18); margin-top: 1px; }
+.sb-step.done .sb-sub    { color: rgba(255,255,255,.28); }
+.sb-step.active .sb-sub  { color: rgba(255,255,255,.48); }
+
+.sb-divider {
+  width: 1.5px; height: 11px;
+  background: rgba(255,255,255,.07);
+  margin: 2px 0 2px 21px;
+}
+
+.sb-footer {
+  padding: 14px 10px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.sb-back {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 7px;
+  color: rgba(255,255,255,.35); font-size: 12px; font-weight: 500;
+  text-decoration: none; transition: all .15s;
+}
+.sb-back:hover { background: rgba(255,255,255,.06); color: rgba(255,255,255,.7); }
+
+/* ── Main ── */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+
+/* ── Topbar ── */
+.topbar {
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 36px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+.topbar-left { display: flex; align-items: center; gap: 13px; }
+.step-pill {
+  background: var(--accent-s); color: var(--accent);
+  font-size: 10.5px; font-weight: 700;
+  padding: 4px 10px; border-radius: 20px;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.topbar-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.22rem; color: var(--ink); letter-spacing: -.015em;
+}
+.btn-logout {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--r);
+  border: 1px solid #fecdd3; background: #fff1f2;
+  color: #be123c; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.btn-logout:hover { background: #ffe4e6; }
+.btn-logout i { font-size: 13px; }
+
+/* ── Content ── */
+.content { padding: 32px 38px 64px; max-width: 1060px; }
+
+/* ── Progress Rail ── */
+.rail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 24px;
+  margin-bottom: 30px;
+  display: flex; align-items: center;
+  box-shadow: var(--shadow-sm);
+}
+.rail-node { display: flex; align-items: center; }
+.rail-circle {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.rail-circle.done  { background: var(--green); color: #fff; }
+.rail-circle.active { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px rgba(37,99,235,.12); }
+.rail-circle.idle  { background: var(--bg); color: var(--ink-3); border: 1.5px solid var(--border); }
+.rail-info { margin-left: 9px; }
+.rail-label { font-size: 12px; font-weight: 600; color: var(--ink); }
+.rail-label.idle { color: var(--ink-3); }
+.rail-sub { font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+.rail-line { flex: 1; height: 1.5px; background: var(--border); margin: 0 14px; }
+.rail-line.done { background: var(--green); }
+
+/* ── Section Head ── */
+.sec-head { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 22px; }
+.sec-icon {
+  width: 40px; height: 40px; border-radius: 9px;
+  background: var(--accent-s);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.sec-icon i { font-size: 18px; color: var(--accent); }
+.sec-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.3rem; color: var(--ink); letter-spacing: -.015em;
+}
+.sec-desc { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; line-height: 1.6; }
+
+/* ── Emp Badge ── */
+.emp-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px 7px 10px; border-radius: 7px;
+  font-size: 12.5px; font-weight: 600;
+  margin-bottom: 24px; border: 1px solid;
+}
+
+/* ── Pattern Grid ── */
+.p-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 980px) { .p-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.p-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden; cursor: pointer;
+  transition: border-color .18s, box-shadow .18s, transform .18s;
+  position: relative; display: flex; flex-direction: column;
+  animation: fadeUp .35s ease both;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.p-card:nth-child(1) { animation-delay: .04s; }
+.p-card:nth-child(2) { animation-delay: .09s; }
+.p-card:nth-child(3) { animation-delay: .14s; }
+.p-card:nth-child(4) { animation-delay: .19s; }
+.p-card:nth-child(5) { animation-delay: .24s; }
+
+.p-card:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.08), var(--shadow); transform: translateY(-2px); }
+.p-card.sel   { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.11), var(--shadow); }
+
+.p-checkmark {
+  position: absolute; top: 10px; right: 10px;
+  width: 22px; height: 22px;
+  background: var(--accent); border-radius: 50%;
+  display: none; align-items: center; justify-content: center; z-index: 3;
+  box-shadow: 0 2px 8px rgba(37,99,235,.4);
+}
+.p-checkmark i { font-size: 10px; color: #fff; }
+.p-card.sel .p-checkmark { display: flex; }
+
+.p-preview { height: 130px; flex-shrink: 0; overflow: hidden; position: relative; }
+
+.p-body { padding: 14px 16px 16px; display: flex; flex-direction: column; flex: 1; }
+.p-name { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 5px; }
+.p-desc { font-size: 11.5px; color: var(--ink-3); line-height: 1.55; flex: 1; }
+.p-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 10px; padding: 3px 9px; border-radius: 20px;
+  font-size: 10.5px; font-weight: 700; align-self: flex-start;
+}
+.p-badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+/* ── Preview Themes ── */
+.pv {
+  width: 100%; height: 100%; padding: 14px;
+  box-sizing: border-box; display: flex;
+  flex-direction: column; justify-content: space-between;
+}
+
+/* Standard */
+.pv-std { background: linear-gradient(148deg, #0f1f50 0%, #1a3a8c 100%); }
+.pv-std .co { color: rgba(255,255,255,.9); font-size: 12px; font-weight: 700; }
+.pv-std .logo-row { display: flex; align-items: center; gap: 7px; }
+.pv-std .mini-logo { width: 20px; height: 20px; background: rgba(255,255,255,.15); border-radius: 5px; }
+.pv-std .chip {
+  background: rgba(255,255,255,.12); color: rgba(255,255,255,.65);
+  font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 3px;
+  letter-spacing: .07em; text-transform: uppercase; align-self: flex-start; margin-top: 8px;
+}
+.pv-std .lines { display: flex; flex-direction: column; gap: 5px; }
+.pv-std .line { height: 4px; border-radius: 2px; background: rgba(255,255,255,.13); }
+
+/* Modern */
+.pv-mod { background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); position: relative; overflow: hidden; }
+.pv-mod::after {
+  content: ''; position: absolute; bottom: -24px; right: -24px;
+  width: 80px; height: 80px;
+  background: rgba(255,255,255,.1); border-radius: 50%;
+}
+.pv-mod .tag {
+  background: rgba(255,255,255,.2); color: rgba(255,255,255,.9);
+  font-size: 9px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  align-self: flex-start; display: inline-block;
+}
+.pv-mod .co { color: #fff; font-size: 13px; font-weight: 800; margin-top: 8px; }
+.pv-mod .sub { color: rgba(255,255,255,.58); font-size: 10px; margin-top: 3px; }
+.pv-mod .divider { height: 1px; background: rgba(255,255,255,.2); margin-top: 10px; }
+
+/* Formal */
+.pv-frm { background: #0a1428; }
+.pv-frm .seal {
+  width: 24px; height: 24px; border: 1.5px solid rgba(255,255,255,.28);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.4); font-size: 11px; margin-bottom: 7px;
+}
+.pv-frm .co { color: rgba(255,255,255,.88); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+.pv-frm .ref { color: rgba(255,255,255,.28); font-size: 9px; margin-top: 2px; }
+.pv-frm .hr { border: none; border-bottom: 1px solid rgba(255,255,255,.1); margin: 8px 0; }
+.pv-frm .body { color: rgba(255,255,255,.4); font-size: 9.5px; line-height: 1.55; }
+
+/* Detailed */
+.pv-det { background: linear-gradient(148deg, #0f1f50 0%, #1a3a8c 100%); }
+.pv-det .co { color: rgba(255,255,255,.9); font-size: 12px; font-weight: 700; }
+.pv-det .ctc-box {
+  background: rgba(255,255,255,.11); border-radius: 6px; padding: 6px 10px;
+  display: flex; justify-content: space-between; align-items: center; margin-top: 7px;
+}
+.pv-det .lbl { color: rgba(255,255,255,.45); font-size: 9px; }
+.pv-det .val { color: #fff; font-size: 13px; font-weight: 800; }
+.pv-det .bars { display: flex; gap: 2px; height: 5px; margin-top: 8px; border-radius: 3px; overflow: hidden; }
+.pv-det .legend { display: flex; gap: 8px; margin-top: 5px; }
+.pv-det .leg-item { display: flex; align-items: center; gap: 3px; }
+.pv-det .leg-dot { width: 5px; height: 5px; border-radius: 50%; }
+.pv-det .leg-lbl { color: rgba(255,255,255,.35); font-size: 9px; }
+
+/* Custom */
+.pv-cst { background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); }
+.pv-cst .icon { font-size: 24px; margin-bottom: 4px; }
+.pv-cst .title { color: #fff; font-size: 12.5px; font-weight: 700; }
+.pv-cst .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 9px; }
+.pv-cst .pill {
+  background: rgba(255,255,255,.2); color: rgba(255,255,255,.88);
+  border-radius: 4px; padding: 2px 7px;
+  font-size: 9px; font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Custom Section ── */
+.cust-sec {
+  display: none;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-top: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.cust-sec.show { display: block; animation: slideDown .22s ease; }
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.cust-head {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg);
+}
+.cust-head-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: #f5f3ff;
+  display: flex; align-items: center; justify-content: center;
+}
+.cust-head-icon i { font-size: 16px; color: #7c3aed; }
+.cust-head-title { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.cust-head-sub   { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+
+.cust-body { padding: 20px 22px; }
+.chips-label { font-size: 11.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 9px; }
+.chips-wrap  { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.chip {
+  background: var(--bg);
+  border: 1px solid var(--border-2);
+  color: var(--accent);
+  padding: 4px 11px; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: 'JetBrains Mono', monospace;
+  transition: all .14s;
+}
+.chip:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.cust-ta {
+  width: 100%; min-height: 165px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r); padding: 13px 15px;
+  font-size: 13.5px; font-family: 'DM Sans', sans-serif;
+  color: var(--ink); line-height: 1.75; resize: vertical;
+  transition: border-color .15s, box-shadow .15s;
+  background: var(--surface);
+}
+.cust-ta:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+.cust-hint {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin-top: 9px; font-size: 11.5px; color: var(--ink-3);
+}
+.cust-hint i { font-size: 13px; color: var(--accent); margin-top: 1px; flex-shrink: 0; }
+.cust-hint code {
+  background: var(--accent-s); color: var(--accent);
+  padding: 1px 5px; border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: #1e293b; color: #fff;
+  padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  opacity: 0; transition: all .25s; z-index: 999; pointer-events: none; white-space: nowrap;
+}
+.toast.err  { background: #be123c; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Nav Actions ── */
+.nav-actions {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 30px; padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.btn-back {
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--ink-2); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.btn-back:hover { border-color: var(--border-2); color: var(--ink); background: var(--bg); }
+.btn-back i { font-size: 14px; }
+
+.btn-next {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 26px;
+  border: none; border-radius: var(--r);
+  background: var(--accent); color: #fff;
+  font-size: 13.5px; font-weight: 700;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+  box-shadow: 0 1px 3px rgba(37,99,235,.28), 0 5px 18px rgba(37,99,235,.18);
+}
+.btn-next:hover { background: var(--accent-d); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(37,99,235,.32), 0 8px 22px rgba(37,99,235,.22); }
+.btn-next:active { transform: none; }
+.btn-next i { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ─── Sidebar ─── -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-mark"><i class="fa-solid fa-file-contract"></i></div>
+      <span class="sb-logo-text">OfferFlow</span>
+    </div>
+
+    <div class="sb-section">Upload Wizard</div>
+
+    <div class="sb-steps">
+      <div class="sb-step done" onclick="location.href='#'">
+        <div class="sb-num"><i class="fa-solid fa-check" style="font-size:9px"></i></div>
+        <div class="sb-meta">
+          <div class="sb-name">Upload Excel</div>
+          <div class="sb-sub">Completed</div>
+        </div>
+      </div>
+      <div class="sb-divider"></div>
+
+      <div class="sb-step done" onclick="location.href='#'">
+        <div class="sb-num"><i class="fa-solid fa-check" style="font-size:9px"></i></div>
+        <div class="sb-meta">
+          <div class="sb-name">Employment Type</div>
+          <div class="sb-sub">Completed</div>
+        </div>
+      </div>
+      <div class="sb-divider"></div>
+
+      <div class="sb-step active">
+        <div class="sb-num">3</div>
+        <div class="sb-meta">
+          <div class="sb-name">Letter Pattern</div>
+          <div class="sb-sub">Choose layout &amp; tone</div>
+        </div>
+      </div>
+      <div class="sb-divider"></div>
+
+      <div class="sb-step">
+        <div class="sb-num">4</div>
+        <div class="sb-meta">
+          <div class="sb-name">Preview &amp; Send</div>
+          <div class="sb-sub">Dispatch emails</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sb-footer">
+      <a href="#" class="sb-back">
+        <i class="fa-solid fa-arrow-left" style="font-size:12px"></i>
+        Back to Dashboard
+      </a>
+    </div>
+  </aside>
+
+  <!-- ─── Main ─── -->
+  <main class="main">
+
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="step-pill">Step 3 of 4</span>
+        <h1 class="topbar-title">Choose Letter Pattern</h1>
+      </div>
+      <button class="btn-logout" onclick="location.href='#'">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </button>
+    </div>
+
+    <div class="content">
+
+      <!-- Progress Rail -->
+      <div class="rail">
+        <div class="rail-node">
+          <div class="rail-circle done"><i class="fa-solid fa-check" style="font-size:10px"></i></div>
+          <div class="rail-info">
+            <div class="rail-label">Upload</div>
+            <div class="rail-sub">Completed</div>
+          </div>
+        </div>
+        <div class="rail-line done"></div>
+        <div class="rail-node">
+          <div class="rail-circle done"><i class="fa-solid fa-check" style="font-size:10px"></i></div>
+          <div class="rail-info">
+            <div class="rail-label">Employment</div>
+            <div class="rail-sub">Completed</div>
+          </div>
+        </div>
+        <div class="rail-line done"></div>
+        <div class="rail-node">
+          <div class="rail-circle active">3</div>
+          <div class="rail-info">
+            <div class="rail-label">Pattern</div>
+            <div class="rail-sub">Current step</div>
+          </div>
+        </div>
+        <div class="rail-line"></div>
+        <div class="rail-node">
+          <div class="rail-circle idle">4</div>
+          <div class="rail-info">
+            <div class="rail-label idle">Preview &amp; Send</div>
+            <div class="rail-sub">Up next</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Head -->
+      <div class="sec-head">
+        <div class="sec-icon"><i class="fa-solid fa-table-cells-large"></i></div>
+        <div>
+          <div class="sec-title">Select a Letter Pattern</div>
+          <div class="sec-desc">Each pattern carries a different tone and structure — pick the one that best reflects your company's culture and communication style.</div>
+        </div>
+      </div>
+
+      <!-- Emp badge (rendered by JS) -->
+      <div id="empBadge" class="emp-badge"></div>
+
+      <!-- Pattern Grid (rendered by JS) -->
+      <div class="p-grid" id="pGrid"></div>
+
+      <!-- Custom section -->
+      <div class="cust-sec" id="custSec">
+        <div class="cust-head">
+          <div class="cust-head-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+          <div>
+            <div class="cust-head-title">Write Your Custom Letter Body</div>
+            <div class="cust-head-sub">Click any placeholder to insert it at your cursor position</div>
+          </div>
+        </div>
+        <div class="cust-body">
+          <div class="chips-label">Available placeholders</div>
+          <div class="chips-wrap" id="chipsWrap"></div>
+<textarea class="cust-ta" id="custBody"
+placeholder="Dear &#123;&#123;Name&#125;&#125;,
+
+We are pleased to extend this offer for the role of &#123;&#123;Role&#125;&#125; at our company.
+
+Your joining date will be &#123;&#123;Joining_date&#125;&#125; and your annual CTC will be ₹&#123;&#123;Salary&#125;&#125;.
+
+We look forward to welcoming you aboard!"></textarea>
+          <div class="cust-hint">
+            <i class="fa-solid fa-circle-info"></i>
+            Placeholders like <code>&#123;&#123;Name&#125;&#125;</code> are replaced with actual candidate data when each letter is generated.
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="nav-actions">
+        <button class="btn-back" onclick="history.back()">
+          <i class="fa-solid fa-arrow-left"></i> Back
+        </button>
+        <button class="btn-next" onclick="goNext()">
+          Preview Letters <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ─── Data ─── */
+const EMP_META = {
+  full_time:  { label:'Full Time',  icon:'💼', color:'#1e40af', bg:'#eff6ff', border:'#bfdbfe' },
+  part_time:  { label:'Part Time',  icon:'⏰', color:'#92400e', bg:'#fffbeb', border:'#fde68a' },
+  internship: { label:'Internship', icon:'🎓', color:'#065f46', bg:'#ecfdf5', border:'#a7f3d0' },
+};
+
+const PATTERNS = [
+  {
+    id: 'standard',
+    name: 'Standard Professional',
+    desc: 'Classic formal layout with company header, offer table, and signature block.',
+    badge: { bg:'#eff6ff', color:'#1e40af', dot:'#3b82f6', text:'Most popular' },
+    preview() {
+      return `<div class="pv pv-std">
+        <div>
+          <div class="logo-row"><div class="mini-logo"></div><span class="co">Acme Corporation</span></div>
+          <div class="chip">Offer of Employment</div>
+        </div>
+        <div class="lines">
+          <div class="line" style="width:90%"></div>
+          <div class="line" style="width:74%"></div>
+          <div class="line" style="width:57%"></div>
+          <div class="line" style="width:83%"></div>
+        </div>
+      </div>`;
+    }
+  },
+  {
+    id: 'modern',
+    name: 'Modern Minimal',
+    desc: 'Fresh gradient header with energetic, casual-professional wording.',
+    badge: { bg:'#f5f3ff', color:'#6d28d9', dot:'#8b5cf6', text:'Trending' },
+    preview(emp) {
+      return `<div class="pv pv-mod">
+        <div class="tag">✦ New Offer ✦</div>
+        <div>
+          <div class="co">Acme Corporation</div>
+          <div class="sub">${emp === 'internship' ? 'Internship Offer · Learning & Growth' : 'Welcome to the team 🎉'}</div>
+          <div class="divider"></div>
+        </div>
+      </div>`;
+    }
+  },
+  {
+    id: 'formal',
+    name: 'Formal Corporate',
+    desc: 'Legal-style language with reference numbers and a strictly official tone.',
+    badge: { bg:'#f0fdf4', color:'#15803d', dot:'#22c55e', text:'Official' },
+    preview() {
+      const d = new Date();
+      return `<div class="pv pv-frm">
+        <div>
+          <div class="seal">⚖</div>
+          <div class="co">ACME CORPORATION</div>
+          <div class="ref">Ref: HR/${d.getFullYear()}/001 · ${d.toLocaleDateString('en-IN')}</div>
+        </div>
+        <div>
+          <div class="hr"></div>
+          <div class="body">This is to formally notify the appointment of the candidate to the position as specified herein, subject to terms and conditions…</div>
+        </div>
+      </div>`;
+    }
+  },
+  {
+    id: 'detailed',
+    name: 'Detailed Breakdown',
+    desc: 'Comprehensive letter with salary component breakdown and full benefit details.',
+    badge: { bg:'#fff7ed', color:'#c2410c', dot:'#f97316', text:'Comprehensive' },
+    preview(emp) {
+      return `<div class="pv pv-det">
+        <div class="co">Acme Corporation</div>
+        <div class="ctc-box">
+          <div><div class="lbl">${emp === 'internship' ? 'Monthly Stipend' : 'Annual CTC'}</div></div>
+          <div class="val">₹ 8,50,000</div>
+        </div>
+        <div class="bars">
+          <div style="flex:50%;background:#34d399"></div>
+          <div style="flex:25%;background:#60a5fa"></div>
+          <div style="flex:15%;background:#f472b6"></div>
+          <div style="flex:10%;background:#fbbf24"></div>
+        </div>
+        <div class="legend">
+          ${[['#34d399','Base'],['#60a5fa','PF'],['#f472b6','HRA'],['#fbbf24','Other']]
+            .map(([c,l]) => `<div class="leg-item"><div class="leg-dot" style="background:${c}"></div><span class="leg-lbl">${l}</span></div>`).join('')}
+        </div>
+      </div>`;
+    }
+  },
+  {
+    id: 'custom',
+    name: 'Custom Template',
+    desc: 'Write your own letter body with dynamic placeholders from your Excel data.',
+    badge: { bg:'#f5f3ff', color:'#7c3aed', dot:'#8b5cf6', text:'Flexible' },
+    preview() {
+      return `<div class="pv pv-cst">
+        <div class="icon">✏️</div>
+        <div>
+          <div class="title">Your Custom Letter</div>
+          <div class="pills">
+            <span class="pill">&#123;&#123;Name&#125;&#125;</span>
+            <span class="pill">&#123;&#123;Role&#125;&#125;</span>
+            <span class="pill">&#123;&#123;Salary&#125;&#125;</span>
+            <span class="pill">&#123;&#123;Joining_date&#125;&#125;</span>
+          </div>
+        </div>
+      </div>`;
+    }
+  }
+];
+
+/* ─── State ─── */
+let selPattern = sessionStorage.getItem('of_pattern') || 'standard';
+let empType    = sessionStorage.getItem('of_emp_type')  || 'full_time';
+
+/* ─── Render Emp Badge ─── */
+function renderEmpBadge() {
+  const m = EMP_META[empType] || EMP_META.full_time;
+  const el = document.getElementById('empBadge');
+  el.style.cssText = `background:${m.bg};border-color:${m.border};color:${m.color}`;
+  el.innerHTML = `
+    <span>${m.icon}</span>
+    <span>Employment type: <strong>${m.label}</strong></span>
+    <span style="font-weight:400;font-size:10.5px;opacity:.55">— patterns are tailored for this type</span>
+  `;
+}
+
+/* ─── Render Grid ─── */
+function renderGrid() {
+  const grid = document.getElementById('pGrid');
+  grid.innerHTML = PATTERNS.map(p => `
+    <div class="p-card${p.id === selPattern ? ' sel' : ''}" id="pc-${p.id}" onclick="selectPattern('${p.id}', this)">
+      <div class="p-checkmark"><i class="fa-solid fa-check"></i></div>
+      <div class="p-preview">${p.preview(empType)}</div>
+      <div class="p-body">
+        <div class="p-name">${p.name}</div>
+        <div class="p-desc">${p.desc}</div>
+        <div class="p-badge" style="background:${p.badge.bg};color:${p.badge.color}">
+          <div class="p-badge-dot" style="background:${p.badge.dot}"></div>
+          ${p.badge.text}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ─── Select Pattern ─── */
+function selectPattern(id, el) {
+  selPattern = id;
+  document.querySelectorAll('.p-card').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  sessionStorage.setItem('of_pattern', id);
+  const cs = document.getElementById('custSec');
+  if (id === 'custom') {
+    cs.classList.add('show');
+    buildChips();
+    restoreCustomBody();
+    setTimeout(() => cs.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
+  } else {
+    cs.classList.remove('show');
+  }
+}
+
+/* ─── Build Placeholder Chips ─── */
+function buildChips() {
+  const allCols  = JSON.parse(sessionStorage.getItem('of_all_cols') || '[]');
+  const required = ['Name', 'Gmail id', 'Role', 'Joining date', 'Salary'];
+  const cols     = [...required, ...allCols.filter(c => !required.includes(c) && c !== 'Gmail id')];
+  // Fallback demo cols if sessionStorage empty
+  const display  = cols.length > 1 ? cols : ['Name', 'Role', 'Salary', 'Joining date', 'Department', 'Manager', 'Location'];
+  document.getElementById('chipsWrap').innerHTML = display
+    .filter(c => c !== 'Gmail id')
+    .map(c => `<span class="chip" onclick="insertPH('&#123;&#123;${c}&#125;&#125;')">&#123;&#123;${c}&#125;&#125;</span>`)
+    .join('');
+}
+
+/* ─── Insert Placeholder ─── */
+function insertPH(text) {
+  const ta = document.getElementById('custBody');
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+  ta.selectionStart = ta.selectionEnd = s + text.length;
+  ta.focus();
+}
+
+/* ─── Restore custom body ─── */
+function restoreCustomBody() {
+  const saved = sessionStorage.getItem('of_custom_body');
+  if (saved) document.getElementById('custBody').value = saved;
+}
+
+/* ─── Go Next ─── */
+function goNext() {
+  if (selPattern === 'custom') {
+    const body = document.getElementById('custBody').value.trim();
+    if (!body) { showToast('Please write your custom letter body', true); return; }
+    sessionStorage.setItem('of_custom_body', body);
+  }
+  sessionStorage.setItem('of_pattern', selPattern);
+  showToast('Proceeding to Preview…');
+  setTimeout(() => location.href = '/step/preview', 900);
+}
+
+/* ─── Toast ─── */
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'toast' + (isErr ? ' err' : '') + ' show';
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ─── Init ─── */
+renderEmpBadge();
+renderGrid();
+
+if (selPattern === 'custom') {
+  document.getElementById('custSec').classList.add('show');
+  buildChips();
+  restoreCustomBody();
+}
+</script>
+</body>
+</html>
