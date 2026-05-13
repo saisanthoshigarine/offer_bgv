@@ -70,6 +70,7 @@ def send_email(to, subject, html_body, attach_path=None, attach_name=None):
     try:
         configuration = sib_api_v3_sdk.Configuration()
         configuration.api_key['api-key'] = os.environ.get("BREVO_API_KEY")
+        
         api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
             sib_api_v3_sdk.ApiClient(configuration)
         )
@@ -88,6 +89,7 @@ def send_email(to, subject, html_body, attach_path=None, attach_name=None):
             html_content=html_body,
             attachment=attachments
         )
+        print(f"[EMAIL DEBUG] to={to} subject={subject}")
         api_instance.send_transac_email(send_smtp_email)
         print(f"[BREVO EMAIL SENT] → {to}")
         return True
@@ -797,21 +799,6 @@ def api_send_offer_emails():
 
     save_cands(cands)
 
-    def auto_cancel(ids):
-        import time
-        time.sleep(172800)
-        c2 = get_cands()
-        changed = any(c2.get(i, {}).get('offer_status') == 'pending' for i in ids)
-        for i in ids:
-            if c2.get(i, {}).get('offer_status') == 'pending':
-                c2[i]['offer_status'] = 'cancelled'
-        if changed:
-            save_cands(c2)
-
-    threading.Thread(target=auto_cancel, args=(cids,), daemon=True).start()
-    return jsonify({'success': True, 'sent': sent})
-
-
 @app.route('/offer-response/<cid>/<action>')
 def offer_response(cid, action):
     cands = get_cands()
@@ -861,7 +848,7 @@ def offer_response(cid, action):
         # Send BG email if not already sent
         if not existing.get('bg_email_sent'):
             vid = existing['id']
-            bg_link = f"{BASE_URL.rstrip('/')}/background-verification/{vid}"
+            bg_link = f"{BASE_URL}/background-verification/{vid}"
             print(f"[BG EMAIL] Sending to {c['email']} | link: {bg_link}")
             success = send_email(
                 c['email'],
